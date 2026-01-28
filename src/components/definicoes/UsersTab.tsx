@@ -179,28 +179,42 @@ export function UsersTab() {
       toast({ title: 'Erro', description: 'Não pode eliminar a sua própria conta.', variant: 'destructive' });
       return;
     }
+
+    // Don't allow deleting the super admin
+    const SUPER_ADMIN_EMAIL = 'wp7.baptista.ktm@gmail.com';
+    if (deletingUser.email === SUPER_ADMIN_EMAIL) {
+      toast({ title: 'Erro', description: 'Não é possível eliminar o super administrador.', variant: 'destructive' });
+      return;
+    }
     
     setDeleting(true);
     
     try {
       // Delete from user_roles first
-      await supabase
+      const { error: roleError } = await supabase
         .from('user_roles')
         .delete()
         .eq('user_id', deletingUser.id);
       
+      if (roleError) {
+        console.error('Error deleting user role:', roleError);
+        // Continue even if role deletion fails (user might not have a role)
+      }
+      
       // Delete from profiles
-      const { error } = await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .delete()
         .eq('id', deletingUser.id);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
+      // Update local state immediately
+      setUsers((prev) => prev.filter((u) => u.id !== deletingUser.id));
+      
       toast({ title: 'Utilizador eliminado', description: 'O utilizador foi removido com sucesso.' });
       setDeleteDialogOpen(false);
       setDeletingUser(null);
-      loadUsers();
     } catch (error) {
       console.error('Error deleting user:', error);
       toast({ title: 'Erro', description: 'Não foi possível eliminar o utilizador.', variant: 'destructive' });
