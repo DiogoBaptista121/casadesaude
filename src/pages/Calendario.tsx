@@ -10,8 +10,27 @@ import { WeekView } from '@/components/calendario/WeekView';
 import { MonthView } from '@/components/calendario/MonthView';
 import { YearView } from '@/components/calendario/YearView';
 import { AppointmentModal } from '@/components/calendario/AppointmentModal';
+import { MTEventViewModal } from '@/components/calendario/MTEventViewModal';
 import { Loader2 } from 'lucide-react';
-import type { Consulta, ConsultaMT, Servico, ConsultaOrigem, ConsultaStatus } from '@/types/database';
+import type { Consulta, Servico, ConsultaOrigem, ConsultaStatus } from '@/types/database';
+
+// Interface for the MT view data
+interface ConsultaMTFichaView {
+  consulta_id: string;
+  funcionario_id: string;
+  numero_funcionario: string;
+  nome_completo: string;
+  telefone: string | null;
+  idade: number | null;
+  data_consulta: string;
+  hora_consulta: string;
+  tipo_exame: string | null;
+  status: ConsultaStatus;
+  notas: string | null;
+  resultado: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
 
 const origemLabels: Record<ConsultaOrigem, string> = {
   casa_saude: 'Casa de Saúde',
@@ -26,7 +45,7 @@ export default function CalendarioPage() {
 
   // Data
   const [consultas, setConsultas] = useState<Consulta[]>([]);
-  const [consultasMT, setConsultasMT] = useState<ConsultaMT[]>([]);
+  const [consultasMT, setConsultasMT] = useState<ConsultaMTFichaView[]>([]);
   const [servicos, setServicos] = useState<Servico[]>([]);
 
   // Filters
@@ -38,6 +57,10 @@ export default function CalendarioPage() {
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<any>(null);
+  
+  // MT View Modal
+  const [mtViewModalOpen, setMtViewModalOpen] = useState(false);
+  const [selectedMTEvent, setSelectedMTEvent] = useState<ConsultaMTFichaView | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -51,17 +74,15 @@ export default function CalendarioPage() {
         .from('consultas')
         .select(`
           *,
-          cartao_saude:cartao_saude_id (id, nome, numero_cartao),
+          cartao_saude:cartao_saude_id (id, nome_completo, numero_cartao),
           servico:servico_id (id, nome, cor)
         `)
         .order('data', { ascending: true }),
+      // Usar a view consultas_mt_ficha_vw para dados MT
       supabase
-        .from('consultas_mt')
-        .select(`
-          *,
-          funcionario:funcionario_id (id, nome, numero_funcionario)
-        `)
-        .order('data', { ascending: true }),
+        .from('consultas_mt_ficha_vw')
+        .select('*')
+        .order('data_consulta', { ascending: true }),
       supabase
         .from('servicos')
         .select('*')
@@ -78,7 +99,7 @@ export default function CalendarioPage() {
     if (consultasMTRes.error) {
       console.error('Error fetching consultas_mt:', consultasMTRes.error);
     } else {
-      setConsultasMT(consultasMTRes.data as unknown as ConsultaMT[]);
+      setConsultasMT(consultasMTRes.data as ConsultaMTFichaView[]);
     }
 
     if (servicosRes.data) setServicos(servicosRes.data as Servico[]);
@@ -124,14 +145,12 @@ export default function CalendarioPage() {
         consultasMT.forEach((c) => {
           if (statusFilter !== 'todos' && c.status !== statusFilter) return;
 
-          const funcionario = c.funcionario as any;
-
           allEvents.push({
-            id: c.id,
-            title: funcionario?.nome || 'Funcionário',
+            id: c.consulta_id,
+            title: `MT - ${c.numero_funcionario} - ${c.nome_completo}`,
             subtitle: c.tipo_exame || 'Exame',
-            date: c.data,
-            time: c.hora?.substring(0, 5) || '00:00',
+            date: c.data_consulta,
+            time: c.hora_consulta?.substring(0, 5) || '00:00',
             status: c.status,
             color: '#f59e0b',
             isMT: true,
@@ -167,18 +186,12 @@ export default function CalendarioPage() {
         });
       }
     } else {
-      const consultaMT = consultasMT.find((c) => c.id === event.id);
+      // Para eventos MT, abrir modal de visualização em vez de edição
+      const consultaMT = consultasMT.find((c) => c.consulta_id === event.id);
       if (consultaMT) {
-        setEditingAppointment({
-          id: consultaMT.id,
-          type: 'consulta_mt' as const,
-          funcionario_id: consultaMT.funcionario_id,
-          tipo_exame: consultaMT.tipo_exame || 'Periódico',
-          data: consultaMT.data,
-          hora: consultaMT.hora?.substring(0, 5) || '09:00',
-          status: consultaMT.status,
-          notas: consultaMT.notas || '',
-        });
+        setSelectedMTEvent(consultaMT);
+        setMtViewModalOpen(true);
+        return;
       }
     }
     setModalOpen(true);
@@ -261,6 +274,13 @@ export default function CalendarioPage() {
         initialData={editingAppointment}
         initialDate={currentDate}
         onSuccess={fetchData}
+      />
+
+      {/* MT Event View Modal */}
+      <MTEventViewModal
+        open={mtViewModalOpen}
+        onOpenChange={setMtViewModalOpen}
+        event={selectedMTEvent}
       />
     </div>
   );
