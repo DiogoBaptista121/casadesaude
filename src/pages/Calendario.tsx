@@ -74,7 +74,7 @@ export default function CalendarioPage() {
         .from('consultas')
         .select(`
           *,
-          cartao_saude:cartao_saude_id (id, nome_completo, numero_cartao),
+          cartao_saude:cartao_saude_id (id, nome_completo, numero_cartao, nif),
           servico:servico_id (id, nome, cor)
         `)
         .order('data', { ascending: true }),
@@ -173,12 +173,11 @@ export default function CalendarioPage() {
     if (event.type === 'consulta') {
       const consulta = consultas.find((c) => c.id === event.id);
       if (consulta) {
+        const cartao = consulta.cartao_saude as any;
         setEditingAppointment({
           id: consulta.id,
           type: 'consulta' as const,
-          cartao_saude_id: consulta.cartao_saude_id,
-          servico_id: consulta.servico_id,
-          origem: consulta.origem,
+          nif: cartao?.nif || consulta.nif || '',
           data: consulta.data,
           hora: consulta.hora?.substring(0, 5) || '09:00',
           status: consulta.status,

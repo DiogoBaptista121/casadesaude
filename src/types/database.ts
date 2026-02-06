@@ -58,6 +58,7 @@ export interface Consulta {
   id: string;
   cartao_saude_id: string;
   servico_id: string;
+  nif: string | null;
   origem: ConsultaOrigem;
   data: string;
   hora: string;
@@ -144,6 +145,32 @@ export interface ConsultaMT {
   updated_at: string;
   // Joined data
   funcionario?: FuncionarioMT;
+}
+
+export interface ConsultaCSFichaView {
+  id: string; // mapped from consulta_id for DataTable compatibility
+  consulta_id: string;
+  cartao_saude_id: string;
+  nif: string;
+  nome_completo: string;
+  numero_cartao: string | null;
+  telefone: string | null;
+  estado_entrega: string | null;
+  freguesia: string | null;
+  data_consulta: string;
+  hora_consulta: string;
+  status: string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface CartaoSaudePorNif {
+  cartao_saude_id: string;
+  numero_cartao: string;
+  nif: string;
+  nome_completo: string;
+  telefone: string | null;
+  estado_entrega: string | null;
 }
 
 export interface AuditoriaLog {

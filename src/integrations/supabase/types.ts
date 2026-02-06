@@ -66,6 +66,7 @@ export type Database = {
           nif: string
           nome_completo: string
           numero_cartao: string | null
+          numero_cartao_int: number | null
           telefone: string | null
           updated_at: string | null
         }
@@ -84,6 +85,7 @@ export type Database = {
           nif: string
           nome_completo: string
           numero_cartao?: string | null
+          numero_cartao_int?: number | null
           telefone?: string | null
           updated_at?: string | null
         }
@@ -102,8 +104,24 @@ export type Database = {
           nif?: string
           nome_completo?: string
           numero_cartao?: string | null
+          numero_cartao_int?: number | null
           telefone?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      cartao_saude_numero_livre: {
+        Row: {
+          created_at: string
+          numero: number
+        }
+        Insert: {
+          created_at?: string
+          numero: number
+        }
+        Update: {
+          created_at?: string
+          numero?: number
         }
         Relationships: []
       }
@@ -142,6 +160,7 @@ export type Database = {
           data: string
           hora: string
           id: string
+          nif: string | null
           notas: string | null
           origem: Database["public"]["Enums"]["consulta_origem"]
           servico_id: string
@@ -155,6 +174,7 @@ export type Database = {
           data: string
           hora: string
           id?: string
+          nif?: string | null
           notas?: string | null
           origem: Database["public"]["Enums"]["consulta_origem"]
           servico_id: string
@@ -168,6 +188,7 @@ export type Database = {
           data?: string
           hora?: string
           id?: string
+          nif?: string | null
           notas?: string | null
           origem?: Database["public"]["Enums"]["consulta_origem"]
           servico_id?: string
@@ -183,11 +204,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "consultas_cartao_saude_fk"
+            columns: ["cartao_saude_id"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude_lista_vw"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "consultas_cartao_saude_id_fkey"
             columns: ["cartao_saude_id"]
             isOneToOne: false
             referencedRelation: "cartao_saude"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultas_cartao_saude_id_fkey"
+            columns: ["cartao_saude_id"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude_lista_vw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultas_nif_fk"
+            columns: ["nif"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude"
+            referencedColumns: ["nif"]
+          },
+          {
+            foreignKeyName: "consultas_nif_fk"
+            columns: ["nif"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude_lista_vw"
+            referencedColumns: ["nif"]
           },
           {
             foreignKeyName: "consultas_servico_id_fkey"
@@ -402,6 +451,166 @@ export type Database = {
       }
     }
     Views: {
+      cartao_saude_lista_vw: {
+        Row: {
+          created_at: string | null
+          data_nascimento: string | null
+          documento_numero: number | null
+          documento_tipo: string | null
+          documento_validade: string | null
+          email: string | null
+          estado: Database["public"]["Enums"]["estado_registo"] | null
+          estado_entrega: string | null
+          freguesia: string | null
+          id: string | null
+          morada: string | null
+          nif: string | null
+          nome_completo: string | null
+          numero_cartao: string | null
+          numero_cartao_int: number | null
+          telefone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_nascimento?: string | null
+          documento_numero?: number | null
+          documento_tipo?: string | null
+          documento_validade?: string | null
+          email?: string | null
+          estado?: Database["public"]["Enums"]["estado_registo"] | null
+          estado_entrega?: string | null
+          freguesia?: string | null
+          id?: string | null
+          morada?: string | null
+          nif?: string | null
+          nome_completo?: string | null
+          numero_cartao?: string | null
+          numero_cartao_int?: number | null
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_nascimento?: string | null
+          documento_numero?: number | null
+          documento_tipo?: string | null
+          documento_validade?: string | null
+          email?: string | null
+          estado?: Database["public"]["Enums"]["estado_registo"] | null
+          estado_entrega?: string | null
+          freguesia?: string | null
+          id?: string | null
+          morada?: string | null
+          nif?: string | null
+          nome_completo?: string | null
+          numero_cartao?: string | null
+          numero_cartao_int?: number | null
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      consultas_cs_ficha_vw: {
+        Row: {
+          cartao_saude_id: string | null
+          consulta_id: string | null
+          created_at: string | null
+          data_consulta: string | null
+          estado_entrega: string | null
+          freguesia: string | null
+          hora_consulta: string | null
+          nif: string | null
+          nome_completo: string | null
+          numero_cartao: string | null
+          status: string | null
+          telefone: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consultas_cartao_saude_fk"
+            columns: ["cartao_saude_id"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultas_cartao_saude_fk"
+            columns: ["cartao_saude_id"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude_lista_vw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultas_cartao_saude_id_fkey"
+            columns: ["cartao_saude_id"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultas_cartao_saude_id_fkey"
+            columns: ["cartao_saude_id"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude_lista_vw"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consultas_nif_fk"
+            columns: ["nif"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude"
+            referencedColumns: ["nif"]
+          },
+          {
+            foreignKeyName: "consultas_nif_fk"
+            columns: ["nif"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude_lista_vw"
+            referencedColumns: ["nif"]
+          },
+        ]
+      }
+      consultas_ficha_vw: {
+        Row: {
+          created_at: string | null
+          data_consulta: string | null
+          hora_consulta: string | null
+          id: string | null
+          nif: string | null
+          nome_completo: string | null
+          notas: string | null
+          numero_cartao: string | null
+          servico_id: string | null
+          status: Database["public"]["Enums"]["consulta_status"] | null
+          telefone: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consultas_nif_fk"
+            columns: ["nif"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude"
+            referencedColumns: ["nif"]
+          },
+          {
+            foreignKeyName: "consultas_nif_fk"
+            columns: ["nif"]
+            isOneToOne: false
+            referencedRelation: "cartao_saude_lista_vw"
+            referencedColumns: ["nif"]
+          },
+          {
+            foreignKeyName: "consultas_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       consultas_mt_ficha_vw: {
         Row: {
           consulta_id: string | null
@@ -559,6 +768,40 @@ export type Database = {
       }
     }
     Functions: {
+      cartao_saude_obter_numero_disponivel: { Args: never; Returns: number }
+      criar_consulta_cs_por_nif: {
+        Args: {
+          p_data: string
+          p_hora: string
+          p_nif: string
+          p_status?: string
+        }
+        Returns: {
+          cartao_saude_id: string
+          consulta_id: string
+          created_at: string
+          data_consulta: string
+          estado_entrega: string
+          hora_consulta: string
+          nif: string
+          nome_completo: string
+          numero_cartao: string
+          status: string
+          telefone: string
+          updated_at: string
+        }[]
+      }
+      get_cartao_saude_por_nif: {
+        Args: { p_nif: string }
+        Returns: {
+          cartao_saude_id: string
+          estado_entrega: string
+          nif: string
+          nome_completo: string
+          numero_cartao: string
+          telefone: string
+        }[]
+      }
       get_funcionario_mt_por_numero: {
         Args: { p_numero: string }
         Returns: {
@@ -570,6 +813,7 @@ export type Database = {
           telefone: string
         }[]
       }
+      get_next_numero_cartao_saude: { Args: never; Returns: number }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
