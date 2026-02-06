@@ -34,19 +34,21 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { toast } from 'sonner';
-import { Loader2, Calendar, Briefcase, Check, ChevronsUpDown } from 'lucide-react';
+import { Loader2, Calendar, Briefcase, Check, ChevronsUpDown, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Servico, CartaoSaude, FuncionarioMT, ConsultaStatus, ConsultaOrigem } from '@/types/database';
+import type { FuncionarioMT, ConsultaStatus, CartaoSaudePorNif } from '@/types/database';
 
 export type AppointmentType = 'consulta' | 'consulta_mt';
 
 interface AppointmentData {
   id?: string;
   type: AppointmentType;
-  // Consulta fields
+  // NIF-based for consulta
+  nif?: string;
+  // Legacy support for editing
   cartao_saude_id?: string;
   servico_id?: string;
-  origem?: ConsultaOrigem;
+  origem?: string;
   // MT fields
   funcionario_id?: string;
   tipo_exame?: string;
@@ -85,14 +87,15 @@ export function AppointmentModal({
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Data
-  const [servicos, setServicos] = useState<Servico[]>([]);
-  const [pacientes, setPacientes] = useState<CartaoSaude[]>([]);
+  // Data for MT
   const [funcionarios, setFuncionarios] = useState<FuncionarioMT[]>([]);
-
-  // Combobox states
-  const [pacienteOpen, setPacienteOpen] = useState(false);
   const [funcionarioOpen, setFuncionarioOpen] = useState(false);
+
+  // NIF lookup state for consulta
+  const [nifValue, setNifValue] = useState('');
+  const [nifLookup, setNifLookup] = useState<CartaoSaudePorNif | null>(null);
+  const [nifError, setNifError] = useState('');
+  const [nifSearching, setNifSearching] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<AppointmentData>({
@@ -100,7 +103,6 @@ export function AppointmentModal({
     data: '',
     hora: '09:00',
     status: 'agendada',
-    origem: 'casa_saude',
     tipo_exame: 'Periódico',
   });
 
@@ -109,8 +111,17 @@ export function AppointmentModal({
       fetchData();
       if (initialData) {
         setFormData(initialData);
+        // If editing a consulta, try to lookup the NIF
+        if (initialData.type === 'consulta' && initialData.nif) {
+          setNifValue(initialData.nif);
+          lookupNif(initialData.nif);
+        } else {
+          setNifValue('');
+          setNifLookup(null);
+          setNifError('');
+        }
       } else {
-        const dateStr = initialDate 
+        const dateStr = initialDate
           ? initialDate.toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0];
         setFormData({
@@ -118,36 +129,64 @@ export function AppointmentModal({
           data: dateStr,
           hora: '09:00',
           status: 'agendada',
-          origem: 'casa_saude',
           tipo_exame: 'Periódico',
         });
+        setNifValue('');
+        setNifLookup(null);
+        setNifError('');
       }
     }
   }, [open, initialData, initialDate]);
 
   const fetchData = async () => {
     setLoading(true);
-    const [servicosRes, pacientesRes, funcionariosRes] = await Promise.all([
-      supabase.from('servicos').select('*').eq('ativo', true).order('nome'),
-      supabase.from('cartao_saude').select('*').eq('estado', 'ativo').order('nome'),
-      supabase.from('funcionarios_mt').select('*').eq('estado', 'ativo').order('nome'),
+    const [funcionariosRes] = await Promise.all([
+      supabase.from('funcionarios_mt').select('*').eq('estado', 'ativo').order('nome_completo'),
     ]);
 
-    if (servicosRes.data) setServicos(servicosRes.data as Servico[]);
-    if (pacientesRes.data) setPacientes(pacientesRes.data as CartaoSaude[]);
     if (funcionariosRes.data) setFuncionarios(funcionariosRes.data as FuncionarioMT[]);
     setLoading(false);
   };
 
+  const lookupNif = async (nif: string) => {
+    const trimmed = nif.trim();
+    if (trimmed.length !== 9 || !/^\d{9}$/.test(trimmed)) {
+      setNifLookup(null);
+      if (trimmed.length > 0) {
+        setNifError('NIF deve ter 9 dígitos');
+      }
+      return;
+    }
+
+    setNifSearching(true);
+    setNifError('');
+    setNifLookup(null);
+
+    const { data, error } = await supabase
+      .rpc('get_cartao_saude_por_nif', { p_nif: trimmed });
+
+    if (error) {
+      console.error('Error looking up NIF:', error);
+      setNifError('Erro ao pesquisar NIF');
+    } else if (!data || data.length === 0) {
+      setNifError('Cartão de saúde não encontrado para este NIF');
+    } else {
+      setNifLookup(data[0] as CartaoSaudePorNif);
+      setNifError('');
+    }
+
+    setNifSearching(false);
+  };
+
   const handleSave = async () => {
-    // Validation
     if (formData.type === 'consulta') {
-      if (!formData.cartao_saude_id) {
-        toast.error('Selecione um paciente');
+      const trimmedNif = nifValue.trim();
+      if (!trimmedNif || trimmedNif.length !== 9) {
+        toast.error('Introduza um NIF válido (9 dígitos)');
         return;
       }
-      if (!formData.servico_id) {
-        toast.error('Selecione um serviço');
+      if (!nifLookup) {
+        toast.error('Pesquise e valide o NIF primeiro');
         return;
       }
     } else {
@@ -166,28 +205,29 @@ export function AppointmentModal({
 
     try {
       if (formData.type === 'consulta') {
-        const payload = {
-          cartao_saude_id: formData.cartao_saude_id!,
-          servico_id: formData.servico_id!,
-          origem: formData.origem || 'casa_saude',
-          data: formData.data,
-          hora: formData.hora,
-          status: formData.status,
-          notas: formData.notas?.trim() || null,
-          created_by: user?.id,
-        };
-
         if (formData.id) {
+          // Edit existing consulta
           const { error } = await supabase
             .from('consultas')
-            .update(payload)
+            .update({
+              data: formData.data,
+              hora: formData.hora,
+              status: formData.status,
+              notas: formData.notas?.trim() || null,
+            })
             .eq('id', formData.id);
           if (error) throw error;
           toast.success('Consulta atualizada');
         } else {
-          const { error } = await supabase.from('consultas').insert([payload]);
+          // Create via RPC
+          const { error } = await supabase.rpc('criar_consulta_cs_por_nif', {
+            p_nif: nifValue.trim(),
+            p_data: formData.data,
+            p_hora: formData.hora,
+            p_status: formData.status.charAt(0).toUpperCase() + formData.status.slice(1),
+          });
           if (error) throw error;
-          toast.success('Consulta criada');
+          toast.success('Consulta marcada com sucesso');
         }
       } else {
         const payload = {
@@ -224,9 +264,7 @@ export function AppointmentModal({
     setSaving(false);
   };
 
-  const selectedPaciente = pacientes.find((p) => p.id === formData.cartao_saude_id);
   const selectedFuncionario = funcionarios.find((f) => f.id === formData.funcionario_id);
-
   const isEditing = !!formData.id;
 
   return (
@@ -235,7 +273,7 @@ export function AppointmentModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {formData.type === 'consulta_mt' ? (
-              <Briefcase className="w-5 h-5 text-amber-500" />
+              <Briefcase className="w-5 h-5 text-accent-foreground" />
             ) : (
               <Calendar className="w-5 h-5 text-primary" />
             )}
@@ -260,15 +298,16 @@ export function AppointmentModal({
                 <Label>Tipo de Marcação *</Label>
                 <Select
                   value={formData.type}
-                  onValueChange={(v) =>
+                  onValueChange={(v) => {
                     setFormData({
                       ...formData,
                       type: v as AppointmentType,
-                      cartao_saude_id: undefined,
-                      servico_id: undefined,
                       funcionario_id: undefined,
-                    })
-                  }
+                    });
+                    setNifValue('');
+                    setNifLookup(null);
+                    setNifError('');
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -291,107 +330,72 @@ export function AppointmentModal({
               </div>
             )}
 
-            {/* Consulta Fields */}
+            {/* Consulta Fields - NIF based */}
             {formData.type === 'consulta' && (
               <>
-                {/* Paciente */}
+                {/* NIF Lookup */}
                 <div className="space-y-2">
-                  <Label>Paciente *</Label>
-                  <Popover open={pacienteOpen} onOpenChange={setPacienteOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        className="w-full justify-between font-normal"
-                      >
-                        {selectedPaciente
-                          ? `${selectedPaciente.nome_completo} (${selectedPaciente.numero_cartao})`
-                          : 'Selecione um paciente...'}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Pesquisar paciente..." />
-                        <CommandList>
-                          <CommandEmpty>Nenhum paciente encontrado.</CommandEmpty>
-                          <CommandGroup>
-                            {pacientes.map((p) => (
-                              <CommandItem
-                                key={p.id}
-                                value={`${p.nome_completo} ${p.numero_cartao}`}
-                                onSelect={() => {
-                                  setFormData({ ...formData, cartao_saude_id: p.id });
-                                  setPacienteOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    'mr-2 h-4 w-4',
-                                    formData.cartao_saude_id === p.id
-                                      ? 'opacity-100'
-                                      : 'opacity-0'
-                                  )}
-                                />
-                                <div>
-                                  <p>{p.nome_completo}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {p.numero_cartao}
-                                  </p>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <Label>NIF do Paciente *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Introduza o NIF (9 dígitos)"
+                      value={nifValue}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 9);
+                        setNifValue(val);
+                        if (val.length === 9) {
+                          lookupNif(val);
+                        } else {
+                          setNifLookup(null);
+                          setNifError('');
+                        }
+                      }}
+                      onBlur={() => {
+                        if (nifValue.length === 9) {
+                          lookupNif(nifValue);
+                        }
+                      }}
+                      maxLength={9}
+                      disabled={isEditing}
+                      className="flex-1"
+                    />
+                    {nifSearching && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mt-2" />}
+                  </div>
+                  {nifError && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      {nifError}
+                    </p>
+                  )}
                 </div>
 
-                {/* Serviço */}
-                <div className="space-y-2">
-                  <Label>Serviço *</Label>
-                  <Select
-                    value={formData.servico_id || ''}
-                    onValueChange={(v) => setFormData({ ...formData, servico_id: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um serviço" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {servicos.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          <span className="flex items-center gap-2">
-                            <span
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: s.cor }}
-                            />
-                            {s.nome}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Unidade */}
-                <div className="space-y-2">
-                  <Label>Unidade</Label>
-                  <Select
-                    value={formData.origem || 'casa_saude'}
-                    onValueChange={(v) =>
-                      setFormData({ ...formData, origem: v as ConsultaOrigem })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="casa_saude">Casa de Saúde</SelectItem>
-                      <SelectItem value="unidade_movel">Unidade Móvel</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Patient Info (read-only) */}
+                {nifLookup && (
+                  <div className="rounded-lg border bg-muted/50 p-3 space-y-1.5">
+                    <p className="text-sm flex items-center gap-1.5 text-primary font-medium">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Paciente encontrado
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Nome:</span>{' '}
+                        <span className="font-medium">{nifLookup.nome_completo}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Nº Cartão:</span>{' '}
+                        <span className="font-medium">{nifLookup.numero_cartao || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Telefone:</span>{' '}
+                        <span className="font-medium">{nifLookup.telefone || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Estado Entrega:</span>{' '}
+                        <span className="font-medium">{nifLookup.estado_entrega || '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
