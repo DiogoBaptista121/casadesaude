@@ -4,21 +4,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Save, Building2 } from 'lucide-react';
-import type { Json } from '@/integrations/supabase/types';
+import { Save, Building2, MapPin, Settings, Loader2 } from 'lucide-react';
 
 interface GeneralSettings {
-  nome_organizacao: string;
-  unidade_padrao: 'casa_saude' | 'unidade_movel';
+  nome_clinica: string; // <-- AQUI ESTAVA O ERRO! Alterado de nome_organizacao para nome_clinica
+  nif: string;
+  email: string;
+  telefone: string;
+  morada: string;
+  codigo_postal: string;
+  cidade: string;
   fuso_horario: string;
   formato_data: string;
 }
 
 const defaultSettings: GeneralSettings = {
-  nome_organizacao: 'Casa de Saúde',
-  unidade_padrao: 'casa_saude',
+  nome_clinica: '',
+  nif: '',
+  email: '',
+  telefone: '',
+  morada: '',
+  codigo_postal: '',
+  cidade: '',
   fuso_horario: 'Europe/Lisbon',
   formato_data: 'DD/MM/AAAA',
 };
@@ -34,19 +44,34 @@ export function GeneralSettingsTab() {
 
   const loadSettings = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('configuracoes')
         .select('*')
-        .eq('chave', 'general_settings')
+        .eq('id', 'global')
         .maybeSingle();
 
       if (error) throw error;
 
-      if (data?.valor) {
-        setSettings({ ...defaultSettings, ...(data.valor as object) });
+      if (data) {
+        setSettings({
+          nome_clinica: data.nome_clinica ?? '',
+          nif: data.nif ?? '',
+          email: data.email ?? '',
+          telefone: data.telefone ?? '',
+          morada: data.morada ?? '',
+          codigo_postal: data.codigo_postal ?? '',
+          cidade: data.cidade ?? '',
+          fuso_horario: data.fuso_horario ?? 'Europe/Lisbon',
+          formato_data: data.formato_data ?? 'DD/MM/AAAA',
+        });
       }
     } catch (error) {
       console.error('Error loading settings:', error);
+      toast({
+        title: 'Erro ao carregar',
+        description: 'Não foi possível carregar as configurações.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -55,125 +80,224 @@ export function GeneralSettingsTab() {
   const saveSettings = async () => {
     setSaving(true);
     try {
-      const { data: existing } = await supabase
+      const { error } = await (supabase as any)
         .from('configuracoes')
-        .select('id')
-        .eq('chave', 'general_settings')
-        .maybeSingle();
+        .update({
+          nome_clinica: settings.nome_clinica,
+          nif: settings.nif,
+          email: settings.email,
+          telefone: settings.telefone,
+          morada: settings.morada,
+          codigo_postal: settings.codigo_postal,
+          cidade: settings.cidade,
+          fuso_horario: settings.fuso_horario,
+          formato_data: settings.formato_data,
+        })
+        .eq('id', 'global');
 
-      const jsonValue = settings as unknown as Json;
+      if (error) throw error;
 
-      if (existing) {
-        const { error } = await supabase
-          .from('configuracoes')
-          .update({ valor: jsonValue })
-          .eq('chave', 'general_settings');
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('configuracoes')
-          .insert([{
-            chave: 'general_settings',
-            valor: jsonValue,
-            descricao: 'Configurações gerais do sistema',
-          }]);
-        if (error) throw error;
-      }
-
-      toast({ title: 'Configurações guardadas', description: 'As definições foram atualizadas com sucesso.' });
+      toast({
+        title: 'Configurações guardadas',
+        description: 'As definições foram atualizadas com sucesso.',
+      });
     } catch (error) {
       console.error('Error saving settings:', error);
-      toast({ title: 'Erro', description: 'Não foi possível guardar as configurações.', variant: 'destructive' });
+      toast({
+        title: 'Erro ao guardar',
+        description: 'Não foi possível guardar as configurações. Tente novamente.',
+        variant: 'destructive',
+      });
     } finally {
       setSaving(false);
     }
   };
 
+  const updateField = (field: keyof GeneralSettings, value: string) => {
+    setSettings((prev) => ({ ...prev, [field]: value }));
+  };
+
   if (loading) {
-    return <div className="py-8 text-center text-muted-foreground">A carregar configurações...</div>;
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">A carregar configurações...</span>
+      </div>
+    );
   }
 
   return (
-    <Card className="card-elevated">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building2 className="h-5 w-5" />
-          Configurações Gerais
-        </CardTitle>
-        <CardDescription>Definições gerais do sistema e da organização</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="nome_organizacao">Nome da Organização</Label>
-            <Input
-              id="nome_organizacao"
-              value={settings.nome_organizacao}
-              onChange={(e) => setSettings({ ...settings, nome_organizacao: e.target.value })}
-              placeholder="Casa de Saúde"
-            />
-          </div>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight">Configurações Gerais</h2>
+        <p className="text-sm text-muted-foreground">
+          Gerencie as informações da clínica, contactos e preferências do sistema.
+        </p>
+      </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="unidade_padrao">Unidade Padrão</Label>
-            <Select
-              value={settings.unidade_padrao}
-              onValueChange={(value: 'casa_saude' | 'unidade_movel') =>
-                setSettings({ ...settings, unidade_padrao: value })
-              }
-            >
-              <SelectTrigger id="unidade_padrao">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="casa_saude">Casa de Saúde</SelectItem>
-                <SelectItem value="unidade_movel">Unidade Móvel</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      <Separator />
 
-          <div className="space-y-2">
-            <Label htmlFor="fuso_horario">Fuso Horário</Label>
-            <Select
-              value={settings.fuso_horario}
-              onValueChange={(value) => setSettings({ ...settings, fuso_horario: value })}
-            >
-              <SelectTrigger id="fuso_horario">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Europe/Lisbon">Europe/Lisbon (WET/WEST)</SelectItem>
-                <SelectItem value="Atlantic/Azores">Atlantic/Azores</SelectItem>
-                <SelectItem value="Atlantic/Madeira">Atlantic/Madeira</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Cards Grid */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Card 1: Identidade da Clínica */}
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Building2 className="h-4 w-4 text-primary" />
+              Identidade da Clínica
+            </CardTitle>
+            <CardDescription>
+              Informações principais da organização.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="nome_clinica">Nome da Organização</Label>
+              <Input
+                id="nome_clinica"
+                value={settings.nome_clinica}
+                onChange={(e) => updateField('nome_clinica', e.target.value)}
+                placeholder="Ex: Casa de Saúde"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nif">NIF</Label>
+              <Input
+                id="nif"
+                value={settings.nif}
+                onChange={(e) => updateField('nif', e.target.value)}
+                placeholder="Ex: 123456789"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="space-y-2">
-            <Label htmlFor="formato_data">Formato de Data</Label>
-            <Select
-              value={settings.formato_data}
-              onValueChange={(value) => setSettings({ ...settings, formato_data: value })}
-            >
-              <SelectTrigger id="formato_data">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DD/MM/AAAA">DD/MM/AAAA</SelectItem>
-                <SelectItem value="AAAA-MM-DD">AAAA-MM-DD</SelectItem>
-                <SelectItem value="MM/DD/AAAA">MM/DD/AAAA</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        {/* Card 2: Contactos e Localização */}
+        <Card className="lg:row-span-2">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MapPin className="h-4 w-4 text-primary" />
+              Contactos e Localização
+            </CardTitle>
+            <CardDescription>
+              Dados de contacto e endereço da clínica.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={settings.email}
+                  onChange={(e) => updateField('email', e.target.value)}
+                  placeholder="geral@clinica.pt"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="telefone">Telefone</Label>
+                <Input
+                  id="telefone"
+                  type="tel"
+                  value={settings.telefone}
+                  onChange={(e) => updateField('telefone', e.target.value)}
+                  placeholder="+351 200 000 000"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="morada">Morada</Label>
+              <Input
+                id="morada"
+                value={settings.morada}
+                onChange={(e) => updateField('morada', e.target.value)}
+                placeholder="Rua Exemplo, nº 1"
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="codigo_postal">Código Postal</Label>
+                <Input
+                  id="codigo_postal"
+                  value={settings.codigo_postal}
+                  onChange={(e) => updateField('codigo_postal', e.target.value)}
+                  placeholder="1000-001"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cidade">Cidade</Label>
+                <Input
+                  id="cidade"
+                  value={settings.cidade}
+                  onChange={(e) => updateField('cidade', e.target.value)}
+                  placeholder="Lisboa"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="flex justify-end">
-          <Button onClick={saveSettings} disabled={saving}>
+        {/* Card 3: Preferências */}
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Settings className="h-4 w-4 text-primary" />
+              Preferências
+            </CardTitle>
+            <CardDescription>
+              Fuso horário e formato de apresentação de datas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fuso_horario">Fuso Horário</Label>
+              <Select
+                value={settings.fuso_horario}
+                onValueChange={(value) => updateField('fuso_horario', value)}
+              >
+                <SelectTrigger id="fuso_horario">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Europe/Lisbon">Europe/Lisbon (WET/WEST)</SelectItem>
+                  <SelectItem value="Atlantic/Azores">Atlantic/Azores</SelectItem>
+                  <SelectItem value="Atlantic/Madeira">Atlantic/Madeira</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="formato_data">Formato de Data</Label>
+              <Select
+                value={settings.formato_data}
+                onValueChange={(value) => updateField('formato_data', value)}
+              >
+                <SelectTrigger id="formato_data">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DD/MM/AAAA">DD/MM/AAAA</SelectItem>
+                  <SelectItem value="AAAA-MM-DD">AAAA-MM-DD</SelectItem>
+                  <SelectItem value="MM/DD/AAAA">MM/DD/AAAA</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <Button onClick={saveSettings} disabled={saving} size="lg">
+          {saving ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
             <Save className="mr-2 h-4 w-4" />
-            {saving ? 'A guardar...' : 'Guardar Alterações'}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          )}
+          {saving ? 'A guardar...' : 'Guardar Alterações'}
+        </Button>
+      </div>
+    </div>
   );
 }

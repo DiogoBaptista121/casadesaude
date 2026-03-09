@@ -6,14 +6,14 @@ import { ConsultasMTTab } from '@/components/medicina-trabalho/ConsultasMTTab';
 
 export default function MedicinaTrabalhoPage() {
   return (
-    <div className="page-enter space-y-6">
+    <div className="page-enter flex flex-col h-full gap-3 max-w-7xl mx-auto w-full p-4">
       <PageHeader
         title="Medicina do Trabalho"
         description="Gestão de funcionários e consultas de medicina do trabalho"
       />
 
-      <Tabs defaultValue="funcionarios" className="w-full">
-        <TabsList>
+      <Tabs defaultValue="funcionarios" className="flex flex-col flex-1 overflow-hidden">
+        <TabsList className="shrink-0">
           <TabsTrigger value="funcionarios" className="gap-2">
             <Users className="w-4 h-4" />
             Funcionários
@@ -24,11 +24,11 @@ export default function MedicinaTrabalhoPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="funcionarios" className="mt-6">
+        <TabsContent value="funcionarios" className="flex-1 overflow-hidden mt-2">
           <FuncionariosTab />
         </TabsContent>
 
-        <TabsContent value="consultas" className="mt-6">
+        <TabsContent value="consultas" className="flex-1 overflow-hidden mt-2">
           <ConsultasMTTab />
         </TabsContent>
       </Tabs>

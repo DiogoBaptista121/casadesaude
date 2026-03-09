@@ -2,17 +2,16 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
+import { CreateUserModal } from './CreateUserModal';
+import { EditUserModal } from './EditUserModal';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSuperAdmin } from '@/hooks/use-super-admin';
-import { UserPlus, Users, Shield, Search, Trash2 } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
+import { UserPlus, Users, Shield, Search, Trash2, Pencil, ToggleLeft, ToggleRight, AlertCircle } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { AppRole } from '@/types/database';
 
@@ -26,27 +25,32 @@ interface UserWithRole {
 
 const roleLabels: Record<AppRole, string> = {
   admin: 'Administrador',
-  staff: 'Staff',
+  manager: 'Gestor',
+  staff: 'Colaborador',
   viewer: 'Visualizador',
 };
 
-const roleColors: Record<AppRole, string> = {
-  admin: 'bg-primary text-primary-foreground',
-  staff: 'bg-secondary text-secondary-foreground',
-  viewer: 'bg-muted text-muted-foreground',
+const roleBadgeColors: Record<AppRole, string> = {
+  admin: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  manager: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  staff: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  viewer: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
 };
 
 export function UsersTab() {
-  const { isAdmin, user: currentUser } = useAuth();
-  const { isSuperAdmin } = useSuperAdmin();
+  const { user: currentUser } = useAuth();
+  const { canManageUsers } = usePermissions();
+
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<AppRole>('viewer');
-  const [inviting, setInviting] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
-  
+
+  // Modal state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
+
   // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserWithRole | null>(null);
@@ -57,113 +61,67 @@ export function UsersTab() {
   }, []);
 
   const loadUsers = async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
-      // Get all profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, nome, email, ativo')
-        .order('nome');
+      // Use SECURITY DEFINER function — bypasses RLS, verifies admin server-side
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)('get_all_users');
 
-      if (profilesError) throw profilesError;
+      if (error) {
+        console.error('[UsersTab] get_all_users error:', error);
+        throw new Error(error.message);
+      }
 
-      // Get all roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
-
-      if (rolesError) throw rolesError;
-
-      // Merge profiles with roles
-      const usersWithRoles: UserWithRole[] = (profiles || []).map((profile) => {
-        const userRole = roles?.find((r) => r.user_id === profile.id);
-        return {
-          ...profile,
-          role: (userRole?.role as AppRole) || null,
-        };
-      });
+      type RawUser = { id: string; email: string; nome: string | null; ativo: boolean | null; role: string | null; };
+      const usersWithRoles: UserWithRole[] = ((data as RawUser[]) || []).map((row) => ({
+        id: row.id,
+        email: row.email,
+        nome: row.nome,
+        ativo: row.ativo,
+        role: (row.role as AppRole) || null,
+      }));
 
       setUsers(usersWithRoles);
     } catch (error) {
-      console.error('Error loading users:', error);
-      toast({ title: 'Erro', description: 'Não foi possível carregar utilizadores.', variant: 'destructive' });
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      setLoadError(msg);
+      toast({
+        title: 'Erro ao carregar utilizadores',
+        description: msg,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: AppRole) => {
-    try {
-      // Check if role exists
-      const { data: existing } = await supabase
-        .from('user_roles')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (existing) {
-        const { error } = await supabase
-          .from('user_roles')
-          .update({ role: newRole })
-          .eq('user_id', userId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: newRole });
-        if (error) throw error;
-      }
-
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-      );
-      toast({ title: 'Role atualizado', description: 'A permissão foi alterada com sucesso.' });
-    } catch (error) {
-      console.error('Error updating role:', error);
-      toast({ title: 'Erro', description: 'Não foi possível alterar a permissão.', variant: 'destructive' });
-    }
-  };
-
   const updateUserStatus = async (userId: string, ativo: boolean) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ ativo })
-        .eq('id', userId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('toggle_user_active', {
+        _target_user_id: userId,
+        _ativo: ativo,
+      });
+      if (error) throw new Error(error.message);
 
-      if (error) throw error;
-
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, ativo } : u))
-      );
-      toast({ title: 'Status atualizado', description: `Utilizador ${ativo ? 'ativado' : 'suspenso'}.` });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ativo } : u));
+      toast({
+        title: 'Estado atualizado',
+        description: `Utilizador ${ativo ? 'ativado' : 'suspenso'} com sucesso.`,
+      });
     } catch (error) {
-      console.error('Error updating status:', error);
-      toast({ title: 'Erro', description: 'Não foi possível alterar o status.', variant: 'destructive' });
+      toast({
+        title: 'Erro',
+        description: error instanceof Error ? error.message : 'Não foi possível alterar o estado.',
+        variant: 'destructive',
+      });
     }
   };
 
-  const inviteUser = async () => {
-    if (!inviteEmail.trim()) {
-      toast({ title: 'Erro', description: 'Introduza um email válido.', variant: 'destructive' });
-      return;
-    }
-
-    setInviting(true);
-    try {
-      // Use Supabase Auth admin invite (requires service role or edge function)
-      // For now, we'll show a message that the user should sign up
-      toast({
-        title: 'Convite',
-        description: `O utilizador ${inviteEmail} deve registar-se na aplicação. Após o registo, pode atribuir-lhe a role desejada.`,
-      });
-      setInviteOpen(false);
-      setInviteEmail('');
-    } catch (error) {
-      console.error('Error inviting user:', error);
-      toast({ title: 'Erro', description: 'Não foi possível enviar o convite.', variant: 'destructive' });
-    } finally {
-      setInviting(false);
-    }
+  const openEditModal = (user: UserWithRole) => {
+    setEditingUser(user);
+    setEditOpen(true);
   };
 
   const openDeleteDialog = (user: UserWithRole) => {
@@ -173,230 +131,192 @@ export function UsersTab() {
 
   const handleDeleteUser = async () => {
     if (!deletingUser) return;
-    
-    // Don't allow deleting yourself
-    if (deletingUser.id === currentUser?.id) {
-      toast({ title: 'Erro', description: 'Não pode eliminar a sua própria conta.', variant: 'destructive' });
-      return;
-    }
-
-    // Don't allow deleting the super admin
-    const SUPER_ADMIN_EMAIL = 'wp7.baptista.ktm@gmail.com';
-    if (deletingUser.email === SUPER_ADMIN_EMAIL) {
-      toast({ title: 'Erro', description: 'Não é possível eliminar o super administrador.', variant: 'destructive' });
-      return;
-    }
-    
     setDeleting(true);
-    
     try {
-      // Delete from user_roles first
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', deletingUser.id);
-      
-      if (roleError) {
-        console.error('Error deleting user role:', roleError);
-        // Continue even if role deletion fails (user might not have a role)
-      }
-      
-      // Delete from profiles
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', deletingUser.id);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('delete_user_profile', {
+        _target_user_id: deletingUser.id,
+      });
+      if (error) throw new Error(error.message);
 
-      if (profileError) throw profileError;
-
-      // Update local state immediately
-      setUsers((prev) => prev.filter((u) => u.id !== deletingUser.id));
-      
+      setUsers(prev => prev.filter(u => u.id !== deletingUser.id));
       toast({ title: 'Utilizador eliminado', description: 'O utilizador foi removido com sucesso.' });
       setDeleteDialogOpen(false);
       setDeletingUser(null);
     } catch (error) {
-      console.error('Error deleting user:', error);
-      toast({ title: 'Erro', description: 'Não foi possível eliminar o utilizador.', variant: 'destructive' });
+      toast({
+        title: 'Erro ao eliminar',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
     } finally {
       setDeleting(false);
     }
   };
 
-  const filteredUsers = users.filter(
-    (u) =>
-      u.nome?.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
+  const filteredUsers = users.filter(u =>
+    u.nome?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  if (!canManageUsers) {
+    return (
+      <div className="py-12 text-center text-muted-foreground">
+        <Shield className="h-12 w-12 mx-auto mb-4 opacity-30" />
+        <p>Não tem permissão para gerir utilizadores.</p>
+      </div>
+    );
+  }
+
   if (loading) {
-    return <div className="py-8 text-center text-muted-foreground">A carregar utilizadores...</div>;
+    return (
+      <div className="py-12 text-center text-muted-foreground">
+        <div className="animate-pulse">A carregar utilizadores...</div>
+      </div>
+    );
   }
 
   return (
-    <Card className="card-elevated">
-      <CardHeader>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Gestão de Utilizadores
-            </CardTitle>
-            <CardDescription>Gerir utilizadores, permissões e estados</CardDescription>
+    <>
+      <Card className="card-elevated">
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Gestão de Utilizadores
+              </CardTitle>
+              <CardDescription>
+                {users.length} utilizador{users.length !== 1 ? 'es' : ''} registado{users.length !== 1 ? 's' : ''}
+              </CardDescription>
+            </div>
+            <Button onClick={() => setCreateOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Adicionar Utilizador
+            </Button>
           </div>
-          {isAdmin && (
-            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Convidar Utilizador
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Convidar Novo Utilizador</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="invite-email">Email</Label>
-                    <Input
-                      id="invite-email"
-                      type="email"
-                      placeholder="email@exemplo.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="invite-role">Role Inicial</Label>
-                    <Select value={inviteRole} onValueChange={(v: AppRole) => setInviteRole(v)}>
-                      <SelectTrigger id="invite-role">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="viewer">Visualizador</SelectItem>
-                        <SelectItem value="staff">Staff</SelectItem>
-                        <SelectItem value="admin">Administrador</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancelar</Button>
-                  </DialogClose>
-                  <Button onClick={inviteUser} disabled={inviting}>
-                    {inviting ? 'A enviar...' : 'Enviar Convite'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {/* Load error */}
+          {loadError && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{loadError}</span>
+              <Button variant="ghost" size="sm" className="ml-auto" onClick={loadUsers}>
+                Tentar novamente
+              </Button>
+            </div>
           )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Pesquisar por nome ou email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
 
-        {filteredUsers.length === 0 ? (
-          <EmptyState title="Sem utilizadores" description="Nenhum utilizador encontrado." />
-        ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  {isSuperAdmin && <TableHead className="w-10"></TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.nome || '-'}</TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      {isAdmin ? (
-                        <Select
-                          value={user.role || 'viewer'}
-                          onValueChange={(v: AppRole) => updateUserRole(user.id, v)}
-                        >
-                          <SelectTrigger className="w-[140px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="viewer">Visualizador</SelectItem>
-                            <SelectItem value="staff">Staff</SelectItem>
-                            <SelectItem value="admin">Administrador</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Badge className={roleColors[user.role || 'viewer']}>
-                          <Shield className="mr-1 h-3 w-3" />
-                          {roleLabels[user.role || 'viewer']}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isAdmin ? (
-                        <Select
-                          value={user.ativo ? 'ativo' : 'suspenso'}
-                          onValueChange={(v) => updateUserStatus(user.id, v === 'ativo')}
-                        >
-                          <SelectTrigger className="w-[120px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ativo">Ativo</SelectItem>
-                            <SelectItem value="suspenso">Suspenso</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Badge variant={user.ativo ? 'default' : 'secondary'}>
-                          {user.ativo ? 'Ativo' : 'Suspenso'}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    {isSuperAdmin && (
-                      <TableCell>
-                        {user.id !== currentUser?.id && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => openDeleteDialog(user)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Pesquisar por nome ou email..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+            />
           </div>
-        )}
-      </CardContent>
 
-      {/* Delete Confirmation Dialog */}
+          {/* Table */}
+          {filteredUsers.length === 0 ? (
+            <EmptyState
+              title={search ? 'Sem resultados' : 'Sem utilizadores'}
+              description={search ? 'Nenhum utilizador corresponde à pesquisa.' : 'Ainda não existem utilizadores registados.'}
+            />
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Permissão</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="w-[120px] text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map(user => {
+                    const isSelf = user.id === currentUser?.id;
+                    return (
+                      <TableRow key={user.id} className={!user.ativo ? 'opacity-60' : ''}>
+                        <TableCell className="font-medium">
+                          {user.nome || <span className="text-muted-foreground italic">Sem nome</span>}
+                          {isSelf && <Badge variant="outline" className="ml-2 text-xs">Você</Badge>}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                        <TableCell>
+                          <Badge className={roleBadgeColors[user.role || 'viewer']}>
+                            <Shield className="mr-1 h-3 w-3" />
+                            {roleLabels[user.role || 'viewer']}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.ativo ? 'default' : 'secondary'}>
+                            {user.ativo ? 'Ativo' : 'Suspenso'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Edit */}
+                            <Button
+                              variant="ghost" size="icon" className="h-8 w-8"
+                              title="Editar utilizador"
+                              onClick={() => openEditModal(user)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
+                            {/* Toggle active (not self) */}
+                            {!isSelf && (
+                              <Button
+                                variant="ghost" size="icon" className="h-8 w-8"
+                                title={user.ativo ? 'Suspender' : 'Ativar'}
+                                onClick={() => updateUserStatus(user.id, !user.ativo)}
+                              >
+                                {user.ativo
+                                  ? <ToggleRight className="h-4 w-4 text-green-600" />
+                                  : <ToggleLeft className="h-4 w-4 text-muted-foreground" />
+                                }
+                              </Button>
+                            )}
+
+                            {/* Delete (not self) */}
+                            {!isSelf && (
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                title="Eliminar utilizador"
+                                onClick={() => openDeleteDialog(user)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <CreateUserModal open={createOpen} onOpenChange={setCreateOpen} onSuccess={loadUsers} />
+      <EditUserModal open={editOpen} onOpenChange={setEditOpen} user={editingUser} onSuccess={loadUsers} currentUserId={currentUser?.id} />
       <DeleteConfirmationDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDeleteUser}
         loading={deleting}
         title="Eliminar Utilizador"
-        description={`Tem a certeza que deseja eliminar o utilizador "${deletingUser?.nome || deletingUser?.email}"? Esta ação não pode ser desfeita.`}
+        description={`Tem a certeza que deseja eliminar "${deletingUser?.nome || deletingUser?.email}"? Esta ação não pode ser desfeita.`}
       />
-    </Card>
+    </>
   );
 }

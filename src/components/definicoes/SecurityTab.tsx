@@ -10,12 +10,51 @@ import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Shield, Key, LogOut, Smartphone, User } from 'lucide-react';
 
+import { useEffect as UseEffectAlias } from 'react';
+
 export function SecurityTab() {
   const { profile, role, signOut, user } = useAuth();
+  UseEffectAlias(() => {
+    if (profile?.nome && !isEditingName) {
+      setNewName(profile.nome);
+    }
+  }, [profile?.nome]);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+
+  // Name editing state
+  const [newName, setNewName] = useState(profile?.nome || '');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+
+  const handleSaveName = async () => {
+    if (!profile?.id) return;
+    if (!newName.trim()) {
+      toast({ title: 'Erro', description: 'O nome não pode estar vazio.', variant: 'destructive' });
+      return;
+    }
+    
+    setSavingName(true);
+    try {
+      const { error } = await supabase
+        .from('perfis')
+        .update({ nome: newName.trim() })
+        .eq('id', profile.id);
+        
+      if (error) throw error;
+      
+      toast({ title: 'Nome atualizado', description: 'O seu nome foi atualizado com sucesso.' });
+      setIsEditingName(false);
+      // Idealmente, recarregaríamos o profile aqui ou usaríamos optimista
+    } catch (error) {
+      console.error('Error updating name:', error);
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o nome.', variant: 'destructive' });
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const handleChangePassword = async () => {
     if (newPassword.length < 6) {
@@ -74,9 +113,30 @@ export function SecurityTab() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid gap-4 sm:grid-cols-3">
-            <div>
+            <div className="flex flex-col gap-2">
               <Label className="text-muted-foreground">Nome</Label>
-              <p className="font-medium">{profile?.nome || '-'}</p>
+              {isEditingName ? (
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={newName} 
+                    onChange={(e) => setNewName(e.target.value)} 
+                    className="h-8 text-sm"
+                  />
+                  <Button size="sm" onClick={handleSaveName} disabled={savingName}>
+                    {savingName ? '...' : 'Salvar'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setIsEditingName(false); setNewName(profile?.nome || ''); }}>
+                    Cancelar
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">{profile?.nome || '-'}</p>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => { setNewName(profile?.nome || ''); setIsEditingName(true); }}>
+                    Editar
+                  </Button>
+                </div>
+              )}
             </div>
             <div>
               <Label className="text-muted-foreground">Email</Label>
@@ -211,9 +271,8 @@ export function SecurityTab() {
 
 function Badge({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'secondary' }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-      variant === 'default' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-    }`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${variant === 'default' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+      }`}>
       {children}
     </span>
   );

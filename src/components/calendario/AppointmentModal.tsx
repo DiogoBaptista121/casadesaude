@@ -36,7 +36,7 @@ import {
 import { toast } from 'sonner';
 import { Loader2, Calendar, Briefcase, Check, ChevronsUpDown, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { FuncionarioMT, ConsultaStatus, CartaoSaudePorNif } from '@/types/database';
+import type { FuncionarioMT, ConsultaStatus, CartaoSaudePorNif, Servico, ConsultaOrigem } from '@/types/database';
 
 export type AppointmentType = 'consulta' | 'consulta_mt';
 
@@ -48,7 +48,7 @@ interface AppointmentData {
   // Legacy support for editing
   cartao_saude_id?: string;
   servico_id?: string;
-  origem?: string;
+  origem?: ConsultaOrigem;
   // MT fields
   funcionario_id?: string;
   tipo_exame?: string;
@@ -91,6 +91,9 @@ export function AppointmentModal({
   const [funcionarios, setFuncionarios] = useState<FuncionarioMT[]>([]);
   const [funcionarioOpen, setFuncionarioOpen] = useState(false);
 
+  // Data for Consultas
+  const [servicos, setServicos] = useState<Servico[]>([]);
+
   // NIF lookup state for consulta
   const [nifValue, setNifValue] = useState('');
   const [nifLookup, setNifLookup] = useState<CartaoSaudePorNif | null>(null);
@@ -104,13 +107,19 @@ export function AppointmentModal({
     hora: '09:00',
     status: 'agendada',
     tipo_exame: 'Periódico',
+    origem: 'casa_saude',
+    servico_id: '',
   });
 
   useEffect(() => {
     if (open) {
       fetchData();
       if (initialData) {
-        setFormData(initialData);
+        setFormData({
+          ...initialData,
+          origem: (initialData.origem as ConsultaOrigem) || 'casa_saude',
+          servico_id: initialData.servico_id || '',
+        });
         // If editing a consulta, try to lookup the NIF
         if (initialData.type === 'consulta' && initialData.nif) {
           setNifValue(initialData.nif);
@@ -130,6 +139,8 @@ export function AppointmentModal({
           hora: '09:00',
           status: 'agendada',
           tipo_exame: 'Periódico',
+          origem: 'casa_saude',
+          servico_id: '',
         });
         setNifValue('');
         setNifLookup(null);
@@ -140,11 +151,15 @@ export function AppointmentModal({
 
   const fetchData = async () => {
     setLoading(true);
-    const [funcionariosRes] = await Promise.all([
-      supabase.from('funcionarios_mt').select('*').eq('estado', 'ativo').order('nome_completo'),
+    const [funcionariosRes, servicosRes] = await Promise.all([
+      // Filter by ativo boolean on the new schema
+      supabase.from('funcionarios_mt' as any).select('*').eq('ativo', true).order('nome'),
+      // New servicos schema: id, nome, cor — no ativo column
+      supabase.from('servicos').select('id, nome, cor').order('nome'),
     ]);
 
-    if (funcionariosRes.data) setFuncionarios(funcionariosRes.data as FuncionarioMT[]);
+    if (funcionariosRes.data) setFuncionarios(funcionariosRes.data as unknown as FuncionarioMT[]);
+    if (servicosRes.data) setServicos(servicosRes.data as unknown as Servico[]);
     setLoading(false);
   };
 
@@ -152,9 +167,7 @@ export function AppointmentModal({
     const trimmed = nif.trim();
     if (trimmed.length !== 9 || !/^\d{9}$/.test(trimmed)) {
       setNifLookup(null);
-      if (trimmed.length > 0) {
-        setNifError('NIF deve ter 9 dígitos');
-      }
+      if (trimmed.length > 0) setNifError('NIF deve ter 9 dígitos');
       return;
     }
 
@@ -162,16 +175,19 @@ export function AppointmentModal({
     setNifError('');
     setNifLookup(null);
 
+    // Direct query — no RPC needed
     const { data, error } = await supabase
-      .rpc('get_cartao_saude_por_nif', { p_nif: trimmed });
+      .from('cartao_saude')
+      .select('id, nif, nome_completo, numero_cartao, telefone, estado_entrega')
+      .eq('nif', trimmed)
+      .maybeSingle();
 
     if (error) {
-      console.error('Error looking up NIF:', error);
-      setNifError('Erro ao pesquisar NIF');
-    } else if (!data || data.length === 0) {
+      setNifError('Erro ao pesquisar NIF: ' + error.message);
+    } else if (!data) {
       setNifError('Cartão de saúde não encontrado para este NIF');
     } else {
-      setNifLookup(data[0] as CartaoSaudePorNif);
+      setNifLookup(data as unknown as CartaoSaudePorNif);
       setNifError('');
     }
 
@@ -214,18 +230,31 @@ export function AppointmentModal({
               hora: formData.hora,
               status: formData.status,
               notas: formData.notas?.trim() || null,
+              servico_id: formData.servico_id,
+              origem: formData.origem as ConsultaOrigem,
             })
             .eq('id', formData.id);
           if (error) throw error;
           toast.success('Consulta atualizada');
         } else {
-          // Create via RPC
-          const { error } = await supabase.rpc('criar_consulta_cs_por_nif', {
-            p_nif: nifValue.trim(),
-            p_data: formData.data,
-            p_hora: formData.hora,
-            p_status: formData.status.charAt(0).toUpperCase() + formData.status.slice(1),
-          });
+          // Create via direct Insert — new schema
+          if (!formData.servico_id) {
+            toast.error('Selecione um serviço');
+            setSaving(false);
+            return;
+          }
+
+          const { error } = await supabase.from('consultas').insert([
+            {
+              paciente_nif: nifValue.trim(),
+              servico_id: formData.servico_id,
+              data: formData.data,
+              hora: formData.hora,
+              status: formData.status,
+              notas: formData.notas?.trim() || null,
+              local: (formData.origem as string) || null,
+            }
+          ] as any);
           if (error) throw error;
           toast.success('Consulta marcada com sucesso');
         }
@@ -396,6 +425,48 @@ export function AppointmentModal({
                     </div>
                   </div>
                 )}
+
+                {/* Serviço e Local */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Serviço *</Label>
+                    <Select
+                      value={formData.servico_id}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, servico_id: value })
+                      }
+                      disabled={isEditing}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {servicos.map((servico) => (
+                          <SelectItem key={servico.id} value={servico.id}>
+                            {servico.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Local *</Label>
+                    <Select
+                      value={formData.origem}
+                      onValueChange={(value: ConsultaOrigem) =>
+                        setFormData({ ...formData, origem: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="casa_saude">Casa de Saúde</SelectItem>
+                        <SelectItem value="unidade_movel">Unidade Móvel</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </>
             )}
 
@@ -413,7 +484,7 @@ export function AppointmentModal({
                         className="w-full justify-between font-normal"
                       >
                         {selectedFuncionario
-                          ? `${selectedFuncionario.nome_completo} (${selectedFuncionario.numero_funcionario})`
+                          ? `${selectedFuncionario.nome} (${selectedFuncionario.numero_funcionario})`
                           : 'Selecione um funcionário...'}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -427,7 +498,7 @@ export function AppointmentModal({
                             {funcionarios.map((f) => (
                               <CommandItem
                                 key={f.id}
-                                value={`${f.nome_completo} ${f.numero_funcionario}`}
+                                value={`${f.nome} ${f.numero_funcionario}`}
                                 onSelect={() => {
                                   setFormData({ ...formData, funcionario_id: f.id });
                                   setFuncionarioOpen(false);
@@ -442,7 +513,7 @@ export function AppointmentModal({
                                   )}
                                 />
                                 <div>
-                                  <p>{f.nome_completo}</p>
+                                  <p>{f.nome}</p>
                                   <p className="text-xs text-muted-foreground">
                                     {f.numero_funcionario}
                                     {f.departamento && ` • ${f.departamento}`}

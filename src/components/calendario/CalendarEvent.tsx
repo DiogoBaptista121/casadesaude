@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { ConsultaStatus } from '@/types/database';
-import { Briefcase, Stethoscope } from 'lucide-react';
+import { Briefcase, Stethoscope, Clock } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -39,37 +39,17 @@ const statusBgColors: Record<ConsultaStatus, string> = {
 
 export function CalendarEvent({ event, onClick, compact = false }: CalendarEventProps) {
   const eventContent = (
-    <button
+        <button
       onClick={() => onClick(event)}
-      className={cn(
-        'w-full text-left rounded-md border transition-all hover:shadow-md cursor-pointer',
-        statusBgColors[event.status],
-        compact ? 'p-1 text-xs' : 'p-2 text-sm'
-      )}
-      style={event.color ? { borderLeftColor: event.color, borderLeftWidth: 3 } : undefined}
+      className="w-full text-left flex items-center gap-1.5 px-1.5 py-1 text-[10px] font-medium rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
     >
-      <div className="flex items-center gap-1">
-        {event.isMT ? (
-          <Briefcase className="w-3 h-3 shrink-0 text-amber-600 dark:text-amber-400" />
-        ) : (
-          <Stethoscope className="w-3 h-3 shrink-0 text-primary" />
-        )}
-        <span className="font-medium truncate">{event.time}</span>
-        {!compact && event.origemLabel && (
-          <span className="text-xs opacity-70 ml-auto truncate">
-            {event.isMT ? 'MT' : event.origemLabel}
-          </span>
-        )}
-      </div>
-      {!compact && (
-        <>
-          <p className="font-medium truncate">{event.title}</p>
-          <p className="text-xs opacity-80 truncate">{event.subtitle}</p>
-        </>
-      )}
-      {compact && (
-        <p className="truncate">{event.title}</p>
-      )}
+      <div 
+        className="w-1.5 h-1.5 rounded-full shrink-0" 
+        style={{ backgroundColor: event.color || (event.isMT ? '#f59e0b' : '#14b8a6') }} 
+      />
+      <span className="truncate text-slate-700 dark:text-slate-200 select-none">
+        {event.time} - {event.title}
+      </span>
     </button>
   );
 

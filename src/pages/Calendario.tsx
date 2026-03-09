@@ -14,22 +14,24 @@ import { MTEventViewModal } from '@/components/calendario/MTEventViewModal';
 import { Loader2 } from 'lucide-react';
 import type { Consulta, Servico, ConsultaOrigem, ConsultaStatus } from '@/types/database';
 
-// Interface for the MT view data
+// Local type that matches consultas_mt + joined funcionarios_mt
 interface ConsultaMTFichaView {
-  consulta_id: string;
+  consulta_id: string;   // the row's own id, aliased for consistency
   funcionario_id: string;
-  numero_funcionario: string;
-  nome_completo: string;
-  telefone: string | null;
-  idade: number | null;
-  data_consulta: string;
-  hora_consulta: string;
+  data_consulta: string; // mapped from 'data'
+  hora_consulta: string; // mapped from 'hora'
   tipo_exame: string | null;
   status: ConsultaStatus;
   notas: string | null;
   resultado: string | null;
   created_at: string | null;
   updated_at: string | null;
+  // joined
+  nome_completo: string;       // mapped from funcionarios_mt.nome
+  numero_funcionario: string;  // mapped from funcionarios_mt.numero_funcionario
+  // optional — not available without extra join, kept null for modal compat
+  telefone: string | null;
+  idade: number | null;
 }
 
 const origemLabels: Record<ConsultaOrigem, string> = {
@@ -40,6 +42,7 @@ const origemLabels: Record<ConsultaOrigem, string> = {
 export default function CalendarioPage() {
   const { canEdit } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false); // non-blocking re-fetch indicator
   const [view, setView] = useState<CalendarView>('mes');
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -57,32 +60,69 @@ export default function CalendarioPage() {
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<any>(null);
-  
+
   // MT View Modal
   const [mtViewModalOpen, setMtViewModalOpen] = useState(false);
   const [selectedMTEvent, setSelectedMTEvent] = useState<ConsultaMTFichaView | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // ── Date-range helper ──────────────────────────────────────────────
+  // Returns [startISO, endISO] for the current view window
+  const getDateRange = (date: Date, v: CalendarView): [string, string] => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const iso = (d: Date) =>
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-  const fetchData = async () => {
-    setLoading(true);
+    if (v === 'dia') {
+      // ±1 day buffer so events at day boundary are never clipped
+      const prev = new Date(date); prev.setDate(prev.getDate() - 1);
+      const next = new Date(date); next.setDate(next.getDate() + 1);
+      return [iso(prev), iso(next)];
+    }
+    if (v === 'semana') {
+      const start = new Date(date);
+      start.setDate(date.getDate() - date.getDay()); // Sunday
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6); // Saturday
+      return [iso(start), iso(end)];
+    }
+    if (v === 'mes') {
+      const start = new Date(date.getFullYear(), date.getMonth(), 1);
+      const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      return [iso(start), iso(end)];
+    }
+    // ano — fetch the whole year
+    return [
+      `${date.getFullYear()}-01-01`,
+      `${date.getFullYear()}-12-31`,
+    ];
+  };
+
+  // Fetch only when currentDate or view changes
+  useEffect(() => {
+    fetchData(currentDate, view);
+  }, [currentDate, view]);
+
+  const fetchData = async (date: Date = currentDate, v: CalendarView = view) => {
+    // First load → full spinner; subsequent navigations → subtle indicator
+    if (!loading) setLoadingMore(true);
+    else setLoading(true);
+
+    const [startDate, endDate] = getDateRange(date, v);
 
     const [consultasRes, consultasMTRes, servicosRes] = await Promise.all([
       supabase
         .from('consultas')
-        .select(`
-          *,
-          cartao_saude:cartao_saude_id (id, nome_completo, numero_cartao, nif),
-          servico:servico_id (id, nome, cor)
-        `)
+        .select('*, servicos(nome, cor)')
+        .gte('data', startDate)
+        .lte('data', endDate)
         .order('data', { ascending: true }),
-      // Usar a view consultas_mt_ficha_vw para dados MT
       supabase
-        .from('consultas_mt_ficha_vw')
+        .from('consultas_mt')
         .select('*')
-        .order('data_consulta', { ascending: true }),
+        .gte('data', startDate)
+        .lte('data', endDate)
+        .order('data', { ascending: true })
+        .order('hora', { ascending: true }),
       supabase
         .from('servicos')
         .select('*')
@@ -90,21 +130,75 @@ export default function CalendarioPage() {
         .order('nome'),
     ]);
 
+    // Also separately fetch funcionarios_mt to get names
+    const { data: funcData } = await supabase
+      .from('funcionarios_mt' as any)
+      .select('id, nome, numero_funcionario');
+
     if (consultasRes.error) {
       console.error('Error fetching consultas:', consultasRes.error);
     } else {
-      setConsultas(consultasRes.data as unknown as Consulta[]);
+      // Batch lookup patient names by NIF (same approach as Consultas.tsx)
+      const rawConsultas = (consultasRes.data ?? []) as any[];
+      const nifsUnicos = [...new Set(rawConsultas.map((c) => c.paciente_nif).filter(Boolean))];
+      const nifNameMap = new Map<string, string>();
+
+      if (nifsUnicos.length > 0) {
+        const { data: cartoes } = await supabase
+          .from('cartao_saude')
+          .select('nif, nome_completo')
+          .in('nif', nifsUnicos as any);
+        ((cartoes ?? []) as any[]).forEach((c) => nifNameMap.set(c.nif, c.nome_completo));
+      }
+
+      // Attach patient names back to each consulta
+      rawConsultas.forEach((c) => {
+        c._nome_paciente = nifNameMap.get(c.paciente_nif) || c.paciente_nif || 'Paciente';
+      });
+
+      setConsultas(rawConsultas as unknown as Consulta[]);
     }
 
     if (consultasMTRes.error) {
       console.error('Error fetching consultas_mt:', consultasMTRes.error);
     } else {
-      setConsultasMT(consultasMTRes.data as ConsultaMTFichaView[]);
+      // Build a lookup map: funcionario_id → { nome, numero_funcionario }
+      const funcMap = new Map<string, { nome: string; numero_funcionario: string }>();
+      ((funcData ?? []) as any[]).forEach((f: any) => {
+        funcMap.set(f.id, { nome: f.nome ?? 'Funcionário', numero_funcionario: f.numero_funcionario ?? '-' });
+      });
+
+      const mapped: ConsultaMTFichaView[] = (consultasMTRes.data ?? []).map((row) => {
+        const func = funcMap.get(row.funcionario_id);
+        // Normalise hora: DB returns 'HH:mm:ss', we need 'HH:mm'
+        const hora = (row.hora ?? '00:00:00').substring(0, 5);
+        // Ensure date is clean YYYY-MM-DD (should always be, but be defensive)
+        const data = (row.data ?? '').substring(0, 10);
+        return {
+          consulta_id: row.id,
+          funcionario_id: row.funcionario_id,
+          data_consulta: data,
+          hora_consulta: hora,
+          tipo_exame: row.tipo_exame,
+          status: (row.status ?? 'agendada') as ConsultaStatus,
+          notas: row.notas,
+          resultado: row.resultado,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          nome_completo: func?.nome ?? 'Funcionário',
+          numero_funcionario: func?.numero_funcionario ?? '-',
+          telefone: null,
+          idade: null,
+        };
+      });
+      console.log('[Calendario] Loaded', mapped.length, 'consultas MT:', mapped.map(m => ({ id: m.consulta_id, data: m.data_consulta, nome: m.nome_completo })));
+      setConsultasMT(mapped);
     }
 
     if (servicosRes.data) setServicos(servicosRes.data as Servico[]);
 
     setLoading(false);
+    setLoadingMore(false);
   };
 
   // Transform data into calendar events
@@ -112,19 +206,27 @@ export default function CalendarioPage() {
     const allEvents: CalendarEventData[] = [];
 
     // Consultas Casa de Saúde
+    // Map filter values (from Select) to the string stored in c.local
+    const unidadeLocalMap: Record<string, string> = {
+      casa_saude: 'Casa de Saúde',
+      unidade_movel: 'Unidade Móvel',
+    };
+    const localParaFiltrar = unidadeFilter !== 'todos' ? unidadeLocalMap[unidadeFilter] : null;
+
     if (tipoFilter === 'todos' || tipoFilter === 'consulta') {
-      consultas.forEach((c) => {
-        // Filter by unidade (origem)
-        if (unidadeFilter !== 'todos' && c.origem !== unidadeFilter) return;
+      consultas.forEach((c: any) => {
+        // Filter by unidade using c.local (new schema)
+        if (localParaFiltrar && c.local !== localParaFiltrar) return;
         if (servicoFilter !== 'todos' && c.servico_id !== servicoFilter) return;
         if (statusFilter !== 'todos' && c.status !== statusFilter) return;
 
-        const cartao = c.cartao_saude as any;
-        const servico = c.servico as any;
+        const servico = (c.servicos ?? c.servico) as any;
+        const nomePaciente = c._nome_paciente || c.paciente_nif || 'Paciente';
+        const localLabel = c.local || 'Casa de Saúde';
 
         allEvents.push({
           id: c.id,
-          title: cartao?.nome || 'Paciente',
+          title: nomePaciente,
           subtitle: servico?.nome || 'Serviço',
           date: c.data,
           time: c.hora?.substring(0, 5) || '00:00',
@@ -132,15 +234,15 @@ export default function CalendarioPage() {
           color: servico?.cor,
           isMT: false,
           type: 'consulta',
-          origem: c.origem,
-          origemLabel: origemLabels[c.origem] || 'Casa de Saúde',
+          origem: undefined,
+          origemLabel: localLabel,
         });
       });
     }
 
-    // Consultas Medicina do Trabalho - sempre associadas à Casa de Saúde
+    // Consultas Medicina do Trabalho — sempre Casa de Saúde
     if (tipoFilter === 'todos' || tipoFilter === 'medicina_trabalho') {
-      // MT está sempre associado a Casa de Saúde, então excluir quando filtro é Unidade Móvel
+      // MT is always 'Casa de Saúde'; exclude when filtering for Unidade Móvel
       if (unidadeFilter !== 'unidade_movel') {
         consultasMT.forEach((c) => {
           if (statusFilter !== 'todos' && c.status !== statusFilter) return;
@@ -169,15 +271,26 @@ export default function CalendarioPage() {
   }, [consultas, consultasMT, servicoFilter, tipoFilter, unidadeFilter, statusFilter]);
 
   const handleEventClick = (event: CalendarEventData) => {
-    // Find the original data to edit
+    // Viewers can only view MT events, not edit anything
+    if (!canEdit) {
+      if (event.type === 'consulta_mt') {
+        const consultaMT = consultasMT.find((c) => c.consulta_id === event.id);
+        if (consultaMT) {
+          setSelectedMTEvent(consultaMT);
+          setMtViewModalOpen(true);
+        }
+      }
+      return; // Block editing for viewers
+    }
+
+    // Find the original data to edit (staff/admin only)
     if (event.type === 'consulta') {
-      const consulta = consultas.find((c) => c.id === event.id);
+      const consulta = consultas.find((c) => c.id === event.id) as any;
       if (consulta) {
-        const cartao = consulta.cartao_saude as any;
         setEditingAppointment({
           id: consulta.id,
           type: 'consulta' as const,
-          nif: cartao?.nif || consulta.nif || '',
+          nif: consulta.paciente_nif || '',
           data: consulta.data,
           hora: consulta.hora?.substring(0, 5) || '09:00',
           status: consulta.status,
@@ -210,61 +323,61 @@ export default function CalendarioPage() {
     setView('mes');
   };
 
-  if (loading) {
-    return (
-      <div className="page-enter space-y-6">
-        <PageHeader
-          title="Calendário"
-          description="Visualização das consultas agendadas"
-        />
-        <div className="flex items-center justify-center h-96">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="page-enter space-y-6">
+    <div className="page-enter flex flex-col h-[calc(100vh-140px)] gap-2 max-w-7xl mx-auto w-full p-4 overflow-hidden">
       <PageHeader
         title="Calendário"
         description="Visualização das consultas agendadas"
       />
 
-      <CalendarFilters
-        servicos={servicos}
-        servicoFilter={servicoFilter}
-        setServicoFilter={setServicoFilter}
-        tipoFilter={tipoFilter}
-        setTipoFilter={setTipoFilter}
-        unidadeFilter={unidadeFilter}
-        setUnidadeFilter={setUnidadeFilter}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        onToday={handleToday}
-        onNewConsulta={handleNewAppointment}
-        canEdit={canEdit}
-      />
+      <div className="shrink-0">
+        <CalendarFilters
+          servicos={servicos}
+          servicoFilter={servicoFilter}
+          setServicoFilter={setServicoFilter}
+          tipoFilter={tipoFilter}
+          setTipoFilter={setTipoFilter}
+          unidadeFilter={unidadeFilter}
+          setUnidadeFilter={setUnidadeFilter}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          onToday={handleToday}
+          onNewConsulta={handleNewAppointment}
+          canEdit={canEdit}
+        />
+      </div>
 
-      <CalendarViewSelector
-        view={view}
-        setView={setView}
-        currentDate={currentDate}
-        setCurrentDate={setCurrentDate}
-      />
+      <div className="shrink-0">
+        <CalendarViewSelector
+          view={view}
+          setView={setView}
+          currentDate={currentDate}
+          setCurrentDate={setCurrentDate}
+        />
+      </div>
 
-      {view === 'dia' && (
-        <DayView date={currentDate} events={events} onEventClick={handleEventClick} />
+      {/* Loading indicator for navigation re-fetches */}
+      {loadingMore && (
+        <div className="shrink-0 flex items-center justify-center gap-2 py-1 text-xs text-muted-foreground">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          A carregar consultas...
+        </div>
       )}
-      {view === 'semana' && (
-        <WeekView date={currentDate} events={events} onEventClick={handleEventClick} />
-      )}
-      {view === 'mes' && (
-        <MonthView date={currentDate} events={events} onEventClick={handleEventClick} />
-      )}
-      {view === 'ano' && (
-        <YearView date={currentDate} events={events} onMonthClick={handleMonthClick} />
-      )}
+
+      <div className="flex-1 overflow-auto min-h-0">
+        {view === 'dia' && (
+          <DayView date={currentDate} events={events} onEventClick={handleEventClick} />
+        )}
+        {view === 'semana' && (
+          <WeekView date={currentDate} events={events} onEventClick={handleEventClick} />
+        )}
+        {view === 'mes' && (
+          <MonthView date={currentDate} events={events} onEventClick={handleEventClick} />
+        )}
+        {view === 'ano' && (
+          <YearView date={currentDate} events={events} onMonthClick={handleMonthClick} />
+        )}
+      </div>
 
       {/* Appointment Modal for Create/Edit */}
       <AppointmentModal

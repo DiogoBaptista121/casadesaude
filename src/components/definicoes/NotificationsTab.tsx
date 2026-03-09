@@ -102,8 +102,36 @@ export function NotificationsTab() {
     }
   };
 
-  const toggleSetting = (key: keyof NotificationSettings) => {
-    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleSetting = async (key: keyof NotificationSettings) => {
+    const newSettings = { ...settings, [key]: !settings[key] };
+    setSettings(newSettings);
+    
+    if (!user?.id) return;
+    try {
+      const { data: existing } = await supabase
+        .from('configuracoes')
+        .select('id')
+        .eq('chave', `notifications_${user.id}`)
+        .maybeSingle();
+
+      const jsonValue = newSettings as unknown as Json;
+
+      if (existing) {
+        await supabase.from('configuracoes').update({ valor: jsonValue }).eq('id', existing.id);
+      } else {
+        await supabase.from('configuracoes').insert([{
+          chave: `notifications_${user.id}`,
+          valor: jsonValue,
+          descricao: 'Preferências de notificação do utilizador',
+        }]);
+      }
+      toast({ title: 'Preferência guardada', description: 'A sua alteração foi guardada automaticamente.', duration: 2000 });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Erro', description: 'Não foi possível guardar a alteração.', variant: 'destructive' });
+      // Revert state on error
+      setSettings(settings);
+    }
   };
 
   if (loading) {
@@ -220,12 +248,7 @@ export function NotificationsTab() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button onClick={saveSettings} disabled={saving}>
-          <Save className="mr-2 h-4 w-4" />
-          {saving ? 'A guardar...' : 'Guardar Preferências'}
-        </Button>
-      </div>
+      
     </div>
   );
 }

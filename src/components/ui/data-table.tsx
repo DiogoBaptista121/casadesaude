@@ -55,39 +55,41 @@ export function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className={cn("table-container", className)}>
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/50 hover:bg-muted/50">
-            {columns.map((column) => (
-              <TableHead 
-                key={column.key} 
-                className={cn("font-semibold text-foreground", column.className)}
-              >
-                {column.header}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((item) => (
-            <TableRow
-              key={item.id}
-              onClick={() => onRowClick?.(item)}
-              className={cn(
-                "transition-colors",
-                onRowClick && "cursor-pointer hover:bg-primary/5"
-              )}
-            >
+    <div className={cn("flex flex-col flex-1 overflow-hidden rounded-md border", className)}>
+      <div className="overflow-y-auto flex-1">
+        <Table>
+          <TableHeader className="sticky top-0 z-10">
+            <TableRow className="bg-muted/80 hover:bg-muted/80 backdrop-blur-sm">
               {columns.map((column) => (
-                <TableCell key={column.key} className={column.className}>
-                  {column.cell(item)}
-                </TableCell>
+                <TableHead
+                  key={column.key}
+                  className={cn("font-semibold text-foreground", column.className)}
+                >
+                  {column.header}
+                </TableHead>
               ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {data.map((item) => (
+              <TableRow
+                key={item.id}
+                onClick={() => onRowClick?.(item)}
+                className={cn(
+                  "transition-colors",
+                  onRowClick && "cursor-pointer hover:bg-primary/5"
+                )}
+              >
+                {columns.map((column) => (
+                  <TableCell key={column.key} className={column.className}>
+                    {column.cell(item)}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

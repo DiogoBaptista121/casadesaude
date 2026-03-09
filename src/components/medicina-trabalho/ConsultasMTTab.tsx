@@ -37,12 +37,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { 
-  Plus, 
-  Search, 
-  FileDown, 
-  FileUp, 
-  Edit2, 
+import {
+  Plus,
+  Search,
+  FileDown,
+  FileUp,
+  Edit2,
   Loader2,
   Stethoscope,
   Check,
@@ -53,37 +53,69 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import type { ConsultaMT, FuncionarioMT, ConsultaStatus } from '@/types/database';
+import type { ConsultaStatus } from '@/types/database';
 import * as XLSX from 'xlsx';
 
+// -------------------------------------------------------------------
+// Local types — independent of stale Supabase generated types
+// -------------------------------------------------------------------
+interface FuncionarioBasico {
+  id: string;
+  nome: string;
+  numero_funcionario: string;
+}
+
+interface ConsultaMTRow {
+  id: string;
+  funcionario_id: string;
+  tipo_exame: string | null;
+  data: string;
+  hora: string;
+  status: ConsultaStatus;
+  resultado: string | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined
+  funcionarios_mt: {
+    id: string;
+    nome: string;
+    numero_funcionario: string;
+  } | null;
+}
+
+// -------------------------------------------------------------------
+// Component
+// -------------------------------------------------------------------
 export function ConsultasMTTab() {
   const { canEdit, user } = useAuth();
   const { isSuperAdmin } = useSuperAdmin();
   const [loading, setLoading] = useState(true);
-  const [consultas, setConsultas] = useState<ConsultaMT[]>([]);
-  const [funcionarios, setFuncionarios] = useState<FuncionarioMT[]>([]);
-  
+  const [consultas, setConsultas] = useState<ConsultaMTRow[]>([]);
+  const [funcionarios, setFuncionarios] = useState<FuncionarioBasico[]>([]);
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [dataFilter, setDataFilter] = useState<string>('');
-  
+
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingConsulta, setEditingConsulta] = useState<ConsultaMT | null>(null);
+  const [editingConsulta, setEditingConsulta] = useState<ConsultaMTRow | null>(null);
   const [saving, setSaving] = useState(false);
-  
-  // Delete state
+
+  // Delete
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingConsulta, setDeletingConsulta] = useState<ConsultaMT | null>(null);
+  const [deletingConsulta, setDeletingConsulta] = useState<ConsultaMTRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  
+
   // Combobox
   const [funcionarioOpen, setFuncionarioOpen] = useState(false);
-  
-  // Form
+
+  // Form — all fields match DB columns exactly
   const [formData, setFormData] = useState({
     funcionario_id: '',
+    numero_funcionario: '',      // kept in sync for the ultimo_exame update
     tipo_exame: 'periódico',
     data: '',
     hora: '',
@@ -96,78 +128,74 @@ export function ConsultasMTTab() {
     fetchData();
   }, []);
 
+  // ----------------------------------------------------------------
+  // Fetch — uses the correct join key (table name, not alias)
+  // ----------------------------------------------------------------
   const fetchData = async () => {
     setLoading(true);
-    
+
     const [consultasRes, funcionariosRes] = await Promise.all([
+      // Join key = the actual table name referenced by the FK
       supabase
-        .from('consultas_mt_ficha_vw')
-        .select('*')
-        .order('data_consulta', { ascending: false })
-        .order('hora_consulta', { ascending: true }),
+        .from('consultas_mt' as any)
+        .select('*, funcionarios_mt(id, nome, numero_funcionario)')
+        .order('data', { ascending: false })
+        .order('hora', { ascending: true }),
+
       supabase
-        .from('funcionarios_mt')
-        .select('*')
-        .eq('estado', 'ativo')
-        .order('nome_completo'),
+        .from('funcionarios_mt' as any)
+        .select('id, nome, numero_funcionario')
+        .eq('estado', 'Ativo' as any)
+        .order('nome'),
     ]);
 
     if (consultasRes.error) {
-      console.error('Error fetching consultas_mt_ficha_vw:', consultasRes.error);
-      toast.error('Erro ao carregar consultas MT');
+      console.error('Error fetching consultas_mt:', consultasRes.error);
+      toast.error('Erro ao carregar consultas MT: ' + consultasRes.error.message);
     } else {
-      // Map view data to ConsultaMT format for compatibility
-      const mappedData = consultasRes.data.map((row: any) => ({
-        id: row.consulta_id,
-        funcionario_id: row.funcionario_id,
-        data: row.data_consulta,
-        hora: row.hora_consulta,
-        tipo_exame: row.tipo_exame,
-        status: row.status,
-        resultado: row.resultado,
-        notas: row.notas,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        created_by: null,
-        // Embed funcionario info for display
-        funcionario: {
-          id: row.funcionario_id,
-          nome_completo: row.nome_completo,
-          numero_funcionario: row.numero_funcionario,
-          telefone: row.telefone,
-          idade: row.idade,
-        },
-      }));
-      setConsultas(mappedData as unknown as ConsultaMT[]);
+      setConsultas((consultasRes.data ?? []) as unknown as ConsultaMTRow[]);
     }
 
-    if (funcionariosRes.data) setFuncionarios(funcionariosRes.data as FuncionarioMT[]);
-    
+    if (funcionariosRes.error) {
+      console.error('Error fetching funcionarios_mt:', funcionariosRes.error);
+    } else {
+      setFuncionarios((funcionariosRes.data ?? []) as unknown as FuncionarioBasico[]);
+    }
+
     setLoading(false);
   };
 
+  // ----------------------------------------------------------------
+  // Filtering
+  // ----------------------------------------------------------------
   const filteredConsultas = consultas.filter((c) => {
-    const funcionario = c.funcionario as any;
-    
+    const func = c.funcionarios_mt;
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      if (!funcionario?.nome?.toLowerCase().includes(term) &&
-          !funcionario?.numero_funcionario?.toLowerCase().includes(term)) {
+      if (
+        !func?.nome?.toLowerCase().includes(term) &&
+        !func?.numero_funcionario?.toLowerCase().includes(term)
+      ) {
         return false;
       }
     }
-    
+
     if (statusFilter !== 'todos' && c.status !== statusFilter) return false;
     if (dataFilter && c.data !== dataFilter) return false;
-    
+
     return true;
   });
 
+  // ----------------------------------------------------------------
+  // Modal helpers
+  // ----------------------------------------------------------------
   const openCreateModal = () => {
     setEditingConsulta(null);
     const today = new Date().toISOString().split('T')[0];
     setFormData({
       funcionario_id: '',
+      numero_funcionario: '',
       tipo_exame: 'periódico',
       data: today,
       hora: '09:00',
@@ -178,13 +206,14 @@ export function ConsultasMTTab() {
     setModalOpen(true);
   };
 
-  const openEditModal = (consulta: ConsultaMT) => {
+  const openEditModal = (consulta: ConsultaMTRow) => {
     setEditingConsulta(consulta);
     setFormData({
       funcionario_id: consulta.funcionario_id,
+      numero_funcionario: consulta.funcionarios_mt?.numero_funcionario || '',
       tipo_exame: consulta.tipo_exame || 'periódico',
       data: consulta.data,
-      hora: consulta.hora.substring(0, 5),
+      hora: (consulta.hora ?? '').substring(0, 5),
       status: consulta.status,
       notas: consulta.notas || '',
       resultado: consulta.resultado || '',
@@ -192,6 +221,9 @@ export function ConsultasMTTab() {
     setModalOpen(true);
   };
 
+  // ----------------------------------------------------------------
+  // Save — payload contains only columns that exist in the DB
+  // ----------------------------------------------------------------
   const handleSave = async () => {
     if (!formData.funcionario_id) {
       toast.error('Selecione um funcionário');
@@ -204,38 +236,61 @@ export function ConsultasMTTab() {
 
     setSaving(true);
 
-    const payload = {
+    // Normalize hora to HH:mm (strip seconds if browser returns HH:mm:ss)
+    const horaFormatada = formData.hora.substring(0, 5);
+
+    // Payload matches the actual DB columns exactly
+    const payload: Record<string, unknown> = {
       funcionario_id: formData.funcionario_id,
+      numero_funcionario: formData.numero_funcionario
+        ? Number(formData.numero_funcionario) || null
+        : null,
       tipo_exame: formData.tipo_exame,
       data: formData.data,
-      hora: formData.hora,
+      hora: horaFormatada,
       status: formData.status,
-      notas: formData.notas.trim() || null,
       resultado: formData.resultado.trim() || null,
-      created_by: user?.id,
+      notas: formData.notas.trim() || null,
+    };
+
+    // Helper: sync ultimo_exame on the employee row after a successful save
+    const syncUltimoExame = async () => {
+      const numFuncionario = Number(formData.numero_funcionario);
+      if (!numFuncionario || !formData.data) return;
+      const { error: syncErr } = await supabase
+        .from('funcionarios_mt')
+        .update({ ultimo_exame: formData.data })
+        .eq('numero_funcionario', numFuncionario as any);
+      if (syncErr) {
+        console.warn('Erro ao sincronizar ultimo_exame:', syncErr.message);
+      }
     };
 
     if (editingConsulta) {
       const { error } = await supabase
-        .from('consultas_mt')
+        .from('consultas_mt' as any)
         .update(payload)
         .eq('id', editingConsulta.id);
 
       if (error) {
         console.error('Error updating consulta_mt:', error);
-        toast.error('Erro ao atualizar consulta');
+        toast.error('Erro ao atualizar consulta: ' + error.message);
       } else {
+        await syncUltimoExame();
         toast.success('Consulta atualizada com sucesso');
         setModalOpen(false);
         fetchData();
       }
     } else {
-      const { error } = await supabase.from('consultas_mt').insert([payload]);
+      const { error } = await supabase
+        .from('consultas_mt' as any)
+        .insert([payload]);
 
       if (error) {
         console.error('Error creating consulta_mt:', error);
-        toast.error('Erro ao criar consulta');
+        toast.error('Erro ao criar consulta: ' + error.message);
       } else {
+        await syncUltimoExame();
         toast.success('Consulta MT criada com sucesso');
         setModalOpen(false);
         fetchData();
@@ -245,17 +300,20 @@ export function ConsultasMTTab() {
     setSaving(false);
   };
 
-  const openDeleteDialog = (consulta: ConsultaMT) => {
+  // ----------------------------------------------------------------
+  // Delete
+  // ----------------------------------------------------------------
+  const openDeleteDialog = (consulta: ConsultaMTRow) => {
     setDeletingConsulta(consulta);
     setDeleteDialogOpen(true);
   };
 
   const handleDelete = async () => {
     if (!deletingConsulta) return;
-    
+
     setDeleting(true);
     const { error } = await supabase
-      .from('consultas_mt')
+      .from('consultas_mt' as any)
       .delete()
       .eq('id', deletingConsulta.id);
 
@@ -271,9 +329,12 @@ export function ConsultasMTTab() {
     setDeleting(false);
   };
 
-  const handleQuickStatusChange = async (consulta: ConsultaMT, newStatus: ConsultaStatus) => {
+  // ----------------------------------------------------------------
+  // Quick status change
+  // ----------------------------------------------------------------
+  const handleQuickStatusChange = async (consulta: ConsultaMTRow, newStatus: ConsultaStatus) => {
     const { error } = await supabase
-      .from('consultas_mt')
+      .from('consultas_mt' as any)
       .update({ status: newStatus })
       .eq('id', consulta.id);
 
@@ -286,13 +347,16 @@ export function ConsultasMTTab() {
     }
   };
 
+  // ----------------------------------------------------------------
+  // Export
+  // ----------------------------------------------------------------
   const handleExport = () => {
     const exportData = filteredConsultas.map((c) => ({
       'Data': c.data,
-      'Hora': c.hora.substring(0, 5),
-      'Funcionário': (c.funcionario as any)?.nome || '',
-      'Nº Funcionário': (c.funcionario as any)?.numero_funcionario || '',
-      'Tipo Exame': c.tipo_exame,
+      'Hora': (c.hora ?? '').substring(0, 5),
+      'Funcionário': c.funcionarios_mt?.nome || '',
+      'Nº Funcionário': c.funcionarios_mt?.numero_funcionario || '',
+      'Tipo Exame': c.tipo_exame || '',
       'Status': c.status,
       'Resultado': c.resultado || '',
       'Notas': c.notas || '',
@@ -305,6 +369,9 @@ export function ConsultasMTTab() {
     toast.success('Ficheiro exportado com sucesso');
   };
 
+  // ----------------------------------------------------------------
+  // Import
+  // ----------------------------------------------------------------
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -323,10 +390,9 @@ export function ConsultasMTTab() {
 
         for (const row of jsonData as any[]) {
           const numFuncionario = row['Nº Funcionário'] || row['numero_funcionario'];
-          
-          // Find funcionario by numero
+
           const { data: funcionarioData } = await supabase
-            .from('funcionarios_mt')
+            .from('funcionarios_mt' as any)
             .select('id')
             .eq('numero_funcionario', numFuncionario)
             .single();
@@ -336,15 +402,14 @@ export function ConsultasMTTab() {
             continue;
           }
 
-          const payload = {
-            funcionario_id: funcionarioData.id,
+          const payload: Record<string, unknown> = {
+            funcionario_id: (funcionarioData as any).id,
             tipo_exame: row['Tipo Exame'] || row['tipo_exame'] || 'periódico',
             data: row['Data'] || row['data'],
             hora: row['Hora'] || row['hora'],
             status: (row['Status'] || row['status'] || 'agendada') as ConsultaStatus,
             notas: row['Notas'] || row['notas'] || null,
             resultado: row['Resultado'] || row['resultado'] || null,
-            created_by: user?.id,
           };
 
           if (!payload.data || !payload.hora) {
@@ -352,7 +417,9 @@ export function ConsultasMTTab() {
             continue;
           }
 
-          const { error } = await supabase.from('consultas_mt').insert([payload]);
+          const { error } = await supabase
+            .from('consultas_mt' as any)
+            .insert([payload]);
           if (!error) imported++;
           else errors++;
         }
@@ -368,28 +435,32 @@ export function ConsultasMTTab() {
     event.target.value = '';
   };
 
+  // ----------------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------------
   const formatData = (data: string) => {
-    return format(new Date(data), "dd 'de' MMM, yyyy", { locale: pt });
+    try {
+      return format(new Date(data), "dd 'de' MMM, yyyy", { locale: pt });
+    } catch {
+      return data;
+    }
   };
 
-  const selectedFuncionario = funcionarios.find(f => f.id === formData.funcionario_id);
+  const selectedFuncionario = funcionarios.find((f) => f.id === formData.funcionario_id);
 
-  const columns: Column<ConsultaMT>[] = [
+  // ----------------------------------------------------------------
+  // Table columns
+  // ----------------------------------------------------------------
+  const columns: Column<ConsultaMTRow>[] = [
     {
       key: 'numero_funcionario',
       header: 'Nº Funcionário',
-      cell: (item) => {
-        const funcionario = item.funcionario as any;
-        return funcionario?.numero_funcionario || '-';
-      },
+      cell: (item) => item.funcionarios_mt?.numero_funcionario || '-',
     },
     {
-      key: 'nome_completo',
+      key: 'nome',
       header: 'Nome Completo',
-      cell: (item) => {
-        const funcionario = item.funcionario as any;
-        return funcionario?.nome_completo || '-';
-      },
+      cell: (item) => item.funcionarios_mt?.nome || '-',
     },
     {
       key: 'data',
@@ -399,7 +470,7 @@ export function ConsultasMTTab() {
     {
       key: 'hora',
       header: 'Hora',
-      cell: (item) => item.hora?.substring(0, 5) || '-',
+      cell: (item) => (item.hora ?? '').substring(0, 5) || '-',
     },
     {
       key: 'tipo_exame',
@@ -437,13 +508,16 @@ export function ConsultasMTTab() {
       key: 'resultado',
       header: 'Resultado',
       cell: (item) => {
-        const resultadoLabels: Record<string, string> = {
+        const labels: Record<string, string> = {
           'apto': 'Apto',
+          'apto_com_recomendacoes': 'Apto c/ Recomendações',
+          'inapto_temporario': 'Inapto Temporário',
           'inapto': 'Inapto',
+          // legacy keys kept for existing data
           'apto_com_restricao': 'Apto c/ Restrição',
           'pendente': 'Pendente',
         };
-        return item.resultado ? resultadoLabels[item.resultado] || item.resultado : '-';
+        return item.resultado ? (labels[item.resultado] || item.resultado) : '-';
       },
     },
     {
@@ -482,28 +556,31 @@ export function ConsultasMTTab() {
     },
   ];
 
+  // ----------------------------------------------------------------
+  // Render
+  // ----------------------------------------------------------------
   return (
-    <div className="space-y-6">
-      {/* Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        <div className="flex flex-col sm:flex-row gap-4 flex-1">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+    <div className="flex flex-col h-full gap-3">
+      {/* Filter bar */}
+      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+        <div className="flex flex-col sm:flex-row gap-2 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input
               placeholder="Pesquisar funcionário..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-9 h-8 text-sm"
             />
           </div>
           <Input
             type="date"
             value={dataFilter}
             onChange={(e) => setDataFilter(e.target.value)}
-            className="w-full sm:w-40"
+            className="w-full sm:w-36 h-8 text-sm"
           />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full sm:w-36 h-8 text-sm">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -518,28 +595,18 @@ export function ConsultasMTTab() {
         </div>
 
         {canEdit && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <label className="cursor-pointer">
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleImport}
-                className="hidden"
-              />
-              <Button variant="outline" className="gap-2" asChild>
-                <span>
-                  <FileUp className="w-4 h-4" />
-                  Importar
-                </span>
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="hidden" />
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" asChild>
+                <span><FileUp className="w-3.5 h-3.5" />Importar</span>
               </Button>
             </label>
-            <Button variant="outline" onClick={handleExport} className="gap-2">
-              <FileDown className="w-4 h-4" />
-              Exportar
+            <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5 h-8 text-xs">
+              <FileDown className="w-3.5 h-3.5" />Exportar
             </Button>
-            <Button onClick={openCreateModal} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nova Consulta MT
+            <Button size="sm" onClick={openCreateModal} className="gap-1.5 h-8 text-xs">
+              <Plus className="w-3.5 h-3.5" />Nova Consulta MT
             </Button>
           </div>
         )}
@@ -555,7 +622,15 @@ export function ConsultasMTTab() {
         onRowClick={canEdit ? openEditModal : undefined}
       />
 
-      {/* Modal */}
+      {/* Count footer */}
+      {!loading && (
+        <div className="shrink-0 flex items-center px-1 py-1.5 text-xs text-muted-foreground border-t border-slate-100">
+          A mostrar <span className="font-semibold text-foreground mx-1">{filteredConsultas.length}</span> de{' '}
+          <span className="font-semibold text-foreground mx-1">{consultas.length}</span> consultas MT
+        </div>
+      )}
+
+      {/* Create / Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -583,7 +658,7 @@ export function ConsultasMTTab() {
                     className="w-full justify-between font-normal"
                   >
                     {selectedFuncionario
-                      ? `${selectedFuncionario.nome_completo} (${selectedFuncionario.numero_funcionario})`
+                      ? `${selectedFuncionario.nome} (${selectedFuncionario.numero_funcionario})`
                       : 'Selecione um funcionário...'}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -597,19 +672,23 @@ export function ConsultasMTTab() {
                         {funcionarios.map((func) => (
                           <CommandItem
                             key={func.id}
-                            value={func.nome_completo}
+                            value={`${func.nome} ${func.numero_funcionario}`}
                             onSelect={() => {
-                              setFormData({ ...formData, funcionario_id: func.id });
+                              setFormData({
+                                ...formData,
+                                funcionario_id: func.id,
+                                numero_funcionario: func.numero_funcionario,
+                              });
                               setFuncionarioOpen(false);
                             }}
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
-                                formData.funcionario_id === func.id ? "opacity-100" : "opacity-0"
+                                'mr-2 h-4 w-4',
+                                formData.funcionario_id === func.id ? 'opacity-100' : 'opacity-0'
                               )}
                             />
-                            {func.nome_completo} ({func.numero_funcionario})
+                            {func.nome} ({func.numero_funcionario})
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -631,15 +710,14 @@ export function ConsultasMTTab() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admissão">Admissão</SelectItem>
-                  <SelectItem value="periódico">Periódico</SelectItem>
-                  <SelectItem value="retorno">Retorno ao Trabalho</SelectItem>
-                  <SelectItem value="mudança_função">Mudança de Função</SelectItem>
-                  <SelectItem value="demissional">Demissional</SelectItem>
+                  <SelectItem value="periódico">Periódica</SelectItem>
+                  <SelectItem value="ocasional">Ocasional</SelectItem>
+                  <SelectItem value="retorno">Regresso ao Trabalho</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Data e Hora */}
+            {/* Data + Hora */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Data *</Label>
@@ -693,9 +771,9 @@ export function ConsultasMTTab() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="apto">Apto</SelectItem>
+                  <SelectItem value="apto_com_recomendacoes">Apto com Recomendações</SelectItem>
+                  <SelectItem value="inapto_temporario">Inapto Temporário</SelectItem>
                   <SelectItem value="inapto">Inapto</SelectItem>
-                  <SelectItem value="apto_com_restricao">Apto com Restrição</SelectItem>
-                  <SelectItem value="pendente">Pendente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -724,7 +802,7 @@ export function ConsultasMTTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation */}
       <DeleteConfirmationDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}

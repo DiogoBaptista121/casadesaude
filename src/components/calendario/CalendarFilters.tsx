@@ -39,10 +39,10 @@ export function CalendarFilters({
   canEdit,
 }: CalendarFiltersProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+    <div className="bg-transparent mb-1 px-1 py-1 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
       <div className="flex flex-wrap gap-2">
         <Select value={servicoFilter} onValueChange={setServicoFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="h-9 w-36 text-xs border-slate-200 bg-transparent rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
             <SelectValue placeholder="Serviço" />
           </SelectTrigger>
           <SelectContent>
@@ -54,7 +54,7 @@ export function CalendarFilters({
         </Select>
 
         <Select value={tipoFilter} onValueChange={setTipoFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="h-9 w-40 text-xs border-slate-200 bg-transparent rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
           <SelectContent>
@@ -65,7 +65,7 @@ export function CalendarFilters({
         </Select>
 
         <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="h-9 w-36 text-xs border-slate-200 bg-transparent rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
             <SelectValue placeholder="Unidade" />
           </SelectTrigger>
           <SelectContent>
@@ -76,7 +76,7 @@ export function CalendarFilters({
         </Select>
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-36">
+          <SelectTrigger className="h-9 w-32 text-xs border-slate-200 bg-transparent rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -91,14 +91,14 @@ export function CalendarFilters({
         </Select>
       </div>
 
-      <div className="flex gap-2">
-        <Button variant="outline" onClick={onToday} className="gap-2">
-          <CalendarDays className="w-4 h-4" />
+      <div className="flex gap-2 shrink-0">
+        <Button variant="outline" size="sm" onClick={onToday} className="gap-1.5 h-9 text-xs border-slate-200 shadow-sm rounded-lg">
+          <CalendarDays className="w-3.5 h-3.5" />
           Hoje
         </Button>
         {canEdit && (
-          <Button onClick={onNewConsulta} className="gap-2">
-            <Plus className="w-4 h-4" />
+          <Button size="sm" onClick={onNewConsulta} className="gap-1.5 h-9 text-xs shadow-sm rounded-lg">
+            <Plus className="w-3.5 h-3.5" />
             Nova Marcação
           </Button>
         )}
