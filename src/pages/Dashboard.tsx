@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -202,6 +204,8 @@ function ServicosFilter({ all, selected, onToggle }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const navigate = useNavigate();
+  const { role } = useAuth();
   const [periodo, setPeriodo] = useState<Periodo>('mes');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
@@ -217,8 +221,30 @@ export default function DashboardPage() {
   const [loadingCS, setLoadingCS] = useState(true);
   const [funcionarios, setFuncionarios] = useState<FuncionarioRow[]>([]);
   const [consultas, setConsultas] = useState<ConsultaRow[]>([]);
+  const [kpisCartoes, setKpisCartoes] = useState({ pendentesValidacao: 0, errosDados: 0, expirados: 0 });
+  const [loadingKpis, setLoadingKpis] = useState(true);
 
   // ── Fetches ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      setLoadingKpis(true);
+      // @ts-ignore
+      const q5 = supabase.from('cartao_saude').select('id', { count: 'exact', head: true }).eq('estado_entrega', 'AGUARDAR_VALIDACAO');
+      // @ts-ignore
+      const qErr = supabase.from('cartao_saude').select('id', { count: 'exact', head: true }).eq('estado_entrega', 'ERRO_DADOS');
+      // @ts-ignore
+      const qExp = supabase.from('cartao_saude').select('id', { count: 'exact', head: true }).eq('estado_entrega', 'EXPIRADO');
+
+      const [validacaoRes, errRes, expRes] = await Promise.all([q5, qErr, qExp]);
+      setKpisCartoes({
+        pendentesValidacao: validacaoRes.count ?? 0,
+        errosDados: errRes.count ?? 0,
+        expirados: expRes.count ?? 0,
+      });
+      setLoadingKpis(false);
+    })();
+  }, []);
+
   useEffect(() => {
     (async () => {
       setLoadingMT(true);
@@ -496,6 +522,55 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Centro de Tarefas (Notificações) ────────────────────────── */}
+        {(role === 'admin' || role === 'gestor') && (
+          <div className="no-print bg-card rounded-2xl border p-5 shadow-sm">
+            <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-md bg-muted text-muted-foreground">
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </span>
+              Centro de Tarefas
+            </h2>
+            {loadingKpis ? (
+              <div className="h-[68px] w-full animate-pulse rounded-lg bg-muted/60" />
+            ) : (kpisCartoes.pendentesValidacao === 0 && kpisCartoes.errosDados === 0 && kpisCartoes.expirados === 0) ? (
+              <div className="flex items-center justify-center py-6 border border-dashed rounded-xl border-border bg-muted/20">
+                <p className="text-sm text-muted-foreground">Tudo em dia. Nenhuma ação pendente.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {kpisCartoes.pendentesValidacao > 0 && (
+                  <button onClick={() => navigate('/cartao-saude?filter=validacao')} className="flex items-center gap-3 p-3 rounded-xl border border-blue-100 hover:bg-blue-50/50 bg-blue-50/20 text-left transition-colors dark:border-blue-900/50 dark:bg-blue-900/10 dark:hover:bg-blue-900/30">
+                    <div className="text-xl">🔵</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-blue-600/80 dark:text-blue-400 font-bold uppercase tracking-wider mb-0.5">Aprovação</p>
+                      <p className="text-sm text-blue-900 dark:text-blue-100 font-semibold truncate">{kpisCartoes.pendentesValidacao} {kpisCartoes.pendentesValidacao === 1 ? 'Cartão Aguarda' : 'Cartões Aguardam'} Validação</p>
+                    </div>
+                  </button>
+                )}
+                {kpisCartoes.errosDados > 0 && (
+                  <button onClick={() => navigate('/cartao-saude?filter=erros')} className="flex items-center gap-3 p-3 rounded-xl border border-orange-100 hover:bg-orange-50/50 bg-orange-50/20 text-left transition-colors dark:border-orange-900/50 dark:bg-orange-900/10 dark:hover:bg-orange-900/30">
+                    <div className="text-xl">🟠</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-orange-600/80 dark:text-orange-400 font-bold uppercase tracking-wider mb-0.5">Incompletos</p>
+                      <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold truncate">{kpisCartoes.errosDados} {kpisCartoes.errosDados === 1 ? 'Cartão com Erro' : 'Cartões com Erros'} nos Dados</p>
+                    </div>
+                  </button>
+                )}
+                {kpisCartoes.expirados > 0 && (
+                  <button onClick={() => navigate('/cartao-saude?filter=expirados')} className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 bg-muted/20 text-left transition-colors">
+                    <div className="text-xl">⚫</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Renovação</p>
+                      <p className="text-sm text-foreground font-semibold truncate">{kpisCartoes.expirados} {kpisCartoes.expirados === 1 ? 'Cartão Expirado' : 'Cartões Expirados'}</p>
+                    </div>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════════════════
             REPORT SHEET (A4 preview)

@@ -56,9 +56,6 @@ import { cn } from '@/lib/utils';
 import type { ConsultaStatus } from '@/types/database';
 import * as XLSX from 'xlsx';
 
-// -------------------------------------------------------------------
-// Local types — independent of stale Supabase generated types
-// -------------------------------------------------------------------
 interface FuncionarioBasico {
   id: string;
   nome: string;
@@ -76,7 +73,6 @@ interface ConsultaMTRow {
   notas: string | null;
   created_at: string;
   updated_at: string;
-  // joined
   funcionarios_mt: {
     id: string;
     nome: string;
@@ -84,47 +80,40 @@ interface ConsultaMTRow {
   } | null;
 }
 
-// -------------------------------------------------------------------
-// Component
-// -------------------------------------------------------------------
 export function ConsultasMTTab() {
   const { canEdit, role, user } = useAuth();
-  const isViewer = role === 'viewer';
-  const canManageBulk = role === 'admin' || role === 'manager';
-  const hasEditAccess = canEdit && !isViewer;
+
+  // ✅ Roles atualizadas: só admin gere medicina do trabalho
+  const isViewer = role === 'visualizador';
+  const canManageBulk = role === 'admin';
+  const hasEditAccess = role === 'admin';
+
   const { isSuperAdmin } = useSuperAdmin();
   const [loading, setLoading] = useState(true);
   const [consultas, setConsultas] = useState<ConsultaMTRow[]>([]);
   const [funcionarios, setFuncionarios] = useState<FuncionarioBasico[]>([]);
 
-  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [dataFilter, setDataFilter] = useState<string>('');
 
-  // Modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editingConsulta, setEditingConsulta] = useState<ConsultaMTRow | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Delete
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingConsulta, setDeletingConsulta] = useState<ConsultaMTRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-
-  // Bulk selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  // Combobox
   const [funcionarioOpen, setFuncionarioOpen] = useState(false);
 
-  // Form — all fields match DB columns exactly
   const [formData, setFormData] = useState({
     funcionario_id: '',
-    numero_funcionario: '',      // kept in sync for the ultimo_exame update
+    numero_funcionario: '',
     tipo_exame: 'periódico',
     data: '',
     hora: '',
@@ -137,14 +126,10 @@ export function ConsultasMTTab() {
     fetchData();
   }, []);
 
-  // ----------------------------------------------------------------
-  // Fetch — uses the correct join key (table name, not alias)
-  // ----------------------------------------------------------------
   const fetchData = async () => {
     setLoading(true);
 
     const [consultasRes, funcionariosRes] = await Promise.all([
-      // Join key = the actual table name referenced by the FK
       supabase
         .from('consultas_mt' as any)
         .select('*, funcionarios_mt(id, nome, numero_funcionario)')
@@ -174,9 +159,6 @@ export function ConsultasMTTab() {
     setLoading(false);
   };
 
-  // ----------------------------------------------------------------
-  // Filtering
-  // ----------------------------------------------------------------
   const filteredConsultas = consultas.filter((c) => {
     const func = c.funcionarios_mt;
 
@@ -196,9 +178,6 @@ export function ConsultasMTTab() {
     return true;
   });
 
-  // ----------------------------------------------------------------
-  // Modal helpers
-  // ----------------------------------------------------------------
   const openCreateModal = () => {
     setEditingConsulta(null);
     const today = new Date().toISOString().split('T')[0];
@@ -230,9 +209,6 @@ export function ConsultasMTTab() {
     setModalOpen(true);
   };
 
-  // ----------------------------------------------------------------
-  // Save — payload contains only columns that exist in the DB
-  // ----------------------------------------------------------------
   const handleSave = async () => {
     if (!formData.funcionario_id) {
       toast.error('Selecione um funcionário');
@@ -245,10 +221,8 @@ export function ConsultasMTTab() {
 
     setSaving(true);
 
-    // Normalize hora to HH:mm (strip seconds if browser returns HH:mm:ss)
     const horaFormatada = formData.hora.substring(0, 5);
 
-    // Payload matches the actual DB columns exactly
     const payload: Record<string, unknown> = {
       funcionario_id: formData.funcionario_id,
       numero_funcionario: formData.numero_funcionario
@@ -262,7 +236,6 @@ export function ConsultasMTTab() {
       notas: formData.notas.trim() || null,
     };
 
-    // Helper: sync ultimo_exame on the employee row after a successful save
     const syncUltimoExame = async () => {
       const numFuncionario = Number(formData.numero_funcionario);
       if (!numFuncionario || !formData.data) return;
@@ -282,7 +255,6 @@ export function ConsultasMTTab() {
         .eq('id', editingConsulta.id);
 
       if (error) {
-        console.error('Error updating consulta_mt:', error);
         toast.error('Erro ao atualizar consulta: ' + error.message);
       } else {
         await syncUltimoExame();
@@ -296,7 +268,6 @@ export function ConsultasMTTab() {
         .insert([payload]);
 
       if (error) {
-        console.error('Error creating consulta_mt:', error);
         toast.error('Erro ao criar consulta: ' + error.message);
       } else {
         await syncUltimoExame();
@@ -309,9 +280,6 @@ export function ConsultasMTTab() {
     setSaving(false);
   };
 
-  // ----------------------------------------------------------------
-  // Delete
-  // ----------------------------------------------------------------
   const openDeleteDialog = (consulta: ConsultaMTRow) => {
     setDeletingConsulta(consulta);
     setDeleteDialogOpen(true);
@@ -327,7 +295,6 @@ export function ConsultasMTTab() {
       .eq('id', deletingConsulta.id);
 
     if (error) {
-      console.error('Error deleting consulta_mt:', error);
       toast.error('Erro ao eliminar consulta MT');
     } else {
       toast.success('Consulta MT eliminada com sucesso');
@@ -338,9 +305,6 @@ export function ConsultasMTTab() {
     setDeleting(false);
   };
 
-  // ----------------------------------------------------------------
-  // Bulk Delete
-  // ----------------------------------------------------------------
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     setBulkDeleting(true);
@@ -360,9 +324,6 @@ export function ConsultasMTTab() {
     setBulkDeleting(false);
   };
 
-  // ----------------------------------------------------------------
-  // Quick status change
-  // ----------------------------------------------------------------
   const handleQuickStatusChange = async (consulta: ConsultaMTRow, newStatus: ConsultaStatus) => {
     const { error } = await supabase
       .from('consultas_mt' as any)
@@ -370,7 +331,6 @@ export function ConsultasMTTab() {
       .eq('id', consulta.id);
 
     if (error) {
-      console.error('Error updating status:', error);
       toast.error('Erro ao atualizar status');
     } else {
       toast.success('Status atualizado');
@@ -378,9 +338,6 @@ export function ConsultasMTTab() {
     }
   };
 
-  // ----------------------------------------------------------------
-  // Export
-  // ----------------------------------------------------------------
   const handleExport = () => {
     const exportData = filteredConsultas.map((c) => ({
       'Data': c.data,
@@ -400,9 +357,6 @@ export function ConsultasMTTab() {
     toast.success('Ficheiro exportado com sucesso');
   };
 
-  // ----------------------------------------------------------------
-  // Import
-  // ----------------------------------------------------------------
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -428,10 +382,7 @@ export function ConsultasMTTab() {
             .eq('numero_funcionario', numFuncionario)
             .single();
 
-          if (!funcionarioData) {
-            errors++;
-            continue;
-          }
+          if (!funcionarioData) { errors++; continue; }
 
           const payload: Record<string, unknown> = {
             funcionario_id: (funcionarioData as any).id,
@@ -443,14 +394,9 @@ export function ConsultasMTTab() {
             resultado: row['Resultado'] || row['resultado'] || null,
           };
 
-          if (!payload.data || !payload.hora) {
-            errors++;
-            continue;
-          }
+          if (!payload.data || !payload.hora) { errors++; continue; }
 
-          const { error } = await supabase
-            .from('consultas_mt' as any)
-            .insert([payload]);
+          const { error } = await supabase.from('consultas_mt' as any).insert([payload]);
           if (!error) imported++;
           else errors++;
         }
@@ -458,7 +404,6 @@ export function ConsultasMTTab() {
         toast.success(`Importação concluída: ${imported} criados, ${errors} erros`);
         fetchData();
       } catch (err) {
-        console.error('Import error:', err);
         toast.error('Erro ao processar ficheiro');
       }
     };
@@ -466,9 +411,6 @@ export function ConsultasMTTab() {
     event.target.value = '';
   };
 
-  // ----------------------------------------------------------------
-  // Helpers
-  // ----------------------------------------------------------------
   const formatData = (data: string) => {
     try {
       return format(new Date(data), "dd 'de' MMM, yyyy", { locale: pt });
@@ -478,8 +420,6 @@ export function ConsultasMTTab() {
   };
 
   const selectedFuncionario = funcionarios.find((f) => f.id === formData.funcionario_id);
-
-  // Page-level select-all (filtered list)
   const allFilteredIds = filteredConsultas.map((c) => c.id);
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selectedIds.includes(id));
 
@@ -491,45 +431,19 @@ export function ConsultasMTTab() {
     }
   };
 
-  // ----------------------------------------------------------------
-  // Table columns
-  // ----------------------------------------------------------------
   const baseColumns: Column<ConsultaMTRow>[] = [
-    {
-      key: 'numero_funcionario',
-      header: 'Nº Funcionário',
-      cell: (item) => item.funcionarios_mt?.numero_funcionario || '-',
-    },
-    {
-      key: 'nome',
-      header: 'Nome Completo',
-      cell: (item) => item.funcionarios_mt?.nome || '-',
-    },
-    {
-      key: 'data',
-      header: 'Data',
-      cell: (item) => formatData(item.data),
-    },
-    {
-      key: 'hora',
-      header: 'Hora',
-      cell: (item) => (item.hora ?? '').substring(0, 5) || '-',
-    },
-    {
-      key: 'tipo_exame',
-      header: 'Tipo de Exame',
-      cell: (item) => item.tipo_exame || 'Periódico',
-    },
+    { key: 'numero_funcionario', header: 'Nº Funcionário', cell: (item) => item.funcionarios_mt?.numero_funcionario || '-' },
+    { key: 'nome', header: 'Nome Completo', cell: (item) => item.funcionarios_mt?.nome || '-' },
+    { key: 'data', header: 'Data', cell: (item) => formatData(item.data) },
+    { key: 'hora', header: 'Hora', cell: (item) => (item.hora ?? '').substring(0, 5) || '-' },
+    { key: 'tipo_exame', header: 'Tipo de Exame', cell: (item) => item.tipo_exame || 'Periódico' },
     {
       key: 'status',
       header: 'Status',
       cell: (item) => (
         <div className="flex items-center gap-2">
           {hasEditAccess ? (
-            <Select
-              value={item.status}
-              onValueChange={(value) => handleQuickStatusChange(item, value as ConsultaStatus)}
-            >
+            <Select value={item.status} onValueChange={(value) => handleQuickStatusChange(item, value as ConsultaStatus)}>
               <SelectTrigger className="w-32 h-8">
                 <StatusBadge status={item.status as ConsultaStatus} />
               </SelectTrigger>
@@ -556,7 +470,6 @@ export function ConsultasMTTab() {
           'apto_com_recomendacoes': 'Apto c/ Recomendações',
           'inapto_temporario': 'Inapto Temporário',
           'inapto': 'Inapto',
-          // legacy keys kept for existing data
           'apto_com_restricao': 'Apto c/ Restrição',
           'pendente': 'Pendente',
         };
@@ -569,27 +482,13 @@ export function ConsultasMTTab() {
       cell: (item) => (
         <div className="flex items-center gap-1">
           {hasEditAccess && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation();
-                openEditModal(item);
-              }}
-            >
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>
               <Edit2 className="w-4 h-4" />
             </Button>
           )}
           {hasEditAccess && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-destructive hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                openDeleteDialog(item);
-              }}
-            >
+            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"
+              onClick={(e) => { e.stopPropagation(); openDeleteDialog(item); }}>
               <Trash2 className="w-4 h-4" />
             </Button>
           )}
@@ -602,60 +501,31 @@ export function ConsultasMTTab() {
   const checkboxColumn: Column<ConsultaMTRow> = {
     key: 'select' as any,
     header: (
-      <input
-        type="checkbox"
-        checked={allSelected}
-        onChange={toggleSelectAll}
-        className="h-4 w-4 rounded border-gray-300"
-        aria-label="Selecionar todos"
-      />
+      <input type="checkbox" checked={allSelected} onChange={toggleSelectAll}
+        className="h-4 w-4 rounded border-gray-300" aria-label="Selecionar todos" />
     ) as any,
     cell: (item) => (
-      <input
-        type="checkbox"
-        checked={selectedIds.includes(item.id)}
-        onChange={(e) => {
-          e.stopPropagation();
-          setSelectedIds((prev) =>
-            e.target.checked ? [...prev, item.id] : prev.filter((id) => id !== item.id)
-          );
-        }}
-        onClick={(e) => e.stopPropagation()}
-        className="h-4 w-4 rounded border-gray-300"
-      />
+      <input type="checkbox" checked={selectedIds.includes(item.id)}
+        onChange={(e) => { e.stopPropagation(); setSelectedIds((prev) => e.target.checked ? [...prev, item.id] : prev.filter((id) => id !== item.id)); }}
+        onClick={(e) => e.stopPropagation()} className="h-4 w-4 rounded border-gray-300" />
     ),
     className: 'w-10',
   };
 
   const columns = !canManageBulk ? baseColumns : [checkboxColumn, ...baseColumns];
 
-  // ----------------------------------------------------------------
-  // Render
-  // ----------------------------------------------------------------
   return (
     <div className="flex flex-col h-full gap-3">
-      {/* Filter bar */}
       <div className="flex flex-col sm:flex-row gap-2 shrink-0">
         <div className="flex flex-col sm:flex-row gap-2 flex-1">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Pesquisar funcionário..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-8 text-sm"
-            />
+            <Input placeholder="Pesquisar funcionário..." value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-8 text-sm" />
           </div>
-          <Input
-            type="date"
-            value={dataFilter}
-            onChange={(e) => setDataFilter(e.target.value)}
-            className="w-full sm:w-36 h-8 text-sm"
-          />
+          <Input type="date" value={dataFilter} onChange={(e) => setDataFilter(e.target.value)} className="w-full sm:w-36 h-8 text-sm" />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-36 h-8 text-sm">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
+            <SelectTrigger className="w-full sm:w-36 h-8 text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
               <SelectItem value="agendada">Agendada</SelectItem>
@@ -665,34 +535,25 @@ export function ConsultasMTTab() {
               <SelectItem value="falta">Falta</SelectItem>
             </SelectContent>
           </Select>
-          {isSuperAdmin && selectedIds.length > 0 && !isViewer && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-1.5 h-8 text-xs shrink-0"
-              onClick={() => setBulkDeleteDialogOpen(true)}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Eliminar ({selectedIds.length})
+          {isSuperAdmin && selectedIds.length > 0 && (
+            <Button variant="destructive" size="sm" className="gap-1.5 h-8 text-xs shrink-0"
+              onClick={() => setBulkDeleteDialogOpen(true)}>
+              <Trash2 className="w-3.5 h-3.5" />Eliminar ({selectedIds.length})
             </Button>
           )}
         </div>
 
         {hasEditAccess && (
           <div className="flex gap-2 shrink-0">
-            {canManageBulk && (
-              <>
-                <label className="cursor-pointer">
-                  <input type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="hidden" />
-                  <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" asChild>
-                    <span><FileUp className="w-3.5 h-3.5" />Importar</span>
-                  </Button>
-                </label>
-                <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5 h-8 text-xs">
-                  <FileDown className="w-3.5 h-3.5" />Exportar
-                </Button>
-              </>
-            )}
+            <label className="cursor-pointer">
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="hidden" />
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" asChild>
+                <span><FileUp className="w-3.5 h-3.5" />Importar</span>
+              </Button>
+            </label>
+            <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5 h-8 text-xs">
+              <FileDown className="w-3.5 h-3.5" />Exportar
+            </Button>
             <Button size="sm" onClick={openCreateModal} className="gap-1.5 h-8 text-xs">
               <Plus className="w-3.5 h-3.5" />Nova Consulta MT
             </Button>
@@ -700,30 +561,21 @@ export function ConsultasMTTab() {
         )}
       </div>
 
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        data={filteredConsultas}
-        loading={loading}
+      <DataTable columns={columns} data={filteredConsultas} loading={loading}
         emptyTitle="Sem consultas MT"
         emptyDescription="Ainda não existem consultas de medicina do trabalho."
-        onRowClick={hasEditAccess ? openEditModal : undefined}
-      />
+        onRowClick={hasEditAccess ? openEditModal : undefined} />
 
-      {/* Count footer */}
       {!loading && (
         <div className="shrink-0 flex items-center justify-between px-1 py-1.5 text-xs text-muted-foreground border-t border-slate-100">
-          <span>
-            A mostrar <span className="font-semibold text-foreground mx-1">{filteredConsultas.length}</span> de{' '}
-            <span className="font-semibold text-foreground mx-1">{consultas.length}</span> consultas MT
-          </span>
-          {selectedIds.length > 0 && !isViewer && (
+          <span>A mostrar <span className="font-semibold text-foreground mx-1">{filteredConsultas.length}</span> de{' '}
+            <span className="font-semibold text-foreground mx-1">{consultas.length}</span> consultas MT</span>
+          {selectedIds.length > 0 && (
             <span className="text-primary font-medium">{selectedIds.length} selecionada(s)</span>
           )}
         </div>
       )}
 
-      {/* Create / Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -732,27 +584,17 @@ export function ConsultasMTTab() {
               {editingConsulta ? 'Editar Consulta MT' : 'Nova Consulta MT'}
             </DialogTitle>
             <DialogDescription>
-              {editingConsulta
-                ? 'Atualize os dados da consulta'
-                : 'Agende uma nova consulta de medicina do trabalho'}
+              {editingConsulta ? 'Atualize os dados da consulta' : 'Agende uma nova consulta de medicina do trabalho'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
-            {/* Funcionário Combobox */}
             <div className="space-y-2">
               <Label>Funcionário *</Label>
               <Popover open={funcionarioOpen} onOpenChange={setFuncionarioOpen}>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={funcionarioOpen}
-                    className="w-full justify-between font-normal"
-                  >
-                    {selectedFuncionario
-                      ? `${selectedFuncionario.nome} (${selectedFuncionario.numero_funcionario})`
-                      : 'Selecione um funcionário...'}
+                  <Button variant="outline" role="combobox" aria-expanded={funcionarioOpen} className="w-full justify-between font-normal">
+                    {selectedFuncionario ? `${selectedFuncionario.nome} (${selectedFuncionario.numero_funcionario})` : 'Selecione um funcionário...'}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -763,24 +605,9 @@ export function ConsultasMTTab() {
                       <CommandEmpty>Nenhum funcionário encontrado.</CommandEmpty>
                       <CommandGroup>
                         {funcionarios.map((func) => (
-                          <CommandItem
-                            key={func.id}
-                            value={`${func.nome} ${func.numero_funcionario}`}
-                            onSelect={() => {
-                              setFormData({
-                                ...formData,
-                                funcionario_id: func.id,
-                                numero_funcionario: func.numero_funcionario,
-                              });
-                              setFuncionarioOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                formData.funcionario_id === func.id ? 'opacity-100' : 'opacity-0'
-                              )}
-                            />
+                          <CommandItem key={func.id} value={`${func.nome} ${func.numero_funcionario}`}
+                            onSelect={() => { setFormData({ ...formData, funcionario_id: func.id, numero_funcionario: func.numero_funcionario }); setFuncionarioOpen(false); }}>
+                            <Check className={cn('mr-2 h-4 w-4', formData.funcionario_id === func.id ? 'opacity-100' : 'opacity-0')} />
                             {func.nome} ({func.numero_funcionario})
                           </CommandItem>
                         ))}
@@ -791,16 +618,10 @@ export function ConsultasMTTab() {
               </Popover>
             </div>
 
-            {/* Tipo de Exame */}
             <div className="space-y-2">
               <Label>Tipo de Exame</Label>
-              <Select
-                value={formData.tipo_exame}
-                onValueChange={(value) => setFormData({ ...formData, tipo_exame: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={formData.tipo_exame} onValueChange={(value) => setFormData({ ...formData, tipo_exame: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admissão">Admissão</SelectItem>
                   <SelectItem value="periódico">Periódica</SelectItem>
@@ -810,38 +631,21 @@ export function ConsultasMTTab() {
               </Select>
             </div>
 
-            {/* Data + Hora */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Data *</Label>
-                <Input
-                  type="date"
-                  value={formData.data}
-                  onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-                />
+                <Input type="date" value={formData.data} onChange={(e) => setFormData({ ...formData, data: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Hora *</Label>
-                <Input
-                  type="time"
-                  value={formData.hora}
-                  onChange={(e) => setFormData({ ...formData, hora: e.target.value })}
-                />
+                <Input type="time" value={formData.hora} onChange={(e) => setFormData({ ...formData, hora: e.target.value })} />
               </div>
             </div>
 
-            {/* Status */}
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value: ConsultaStatus) =>
-                  setFormData({ ...formData, status: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={formData.status} onValueChange={(value: ConsultaStatus) => setFormData({ ...formData, status: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="agendada">Agendada</SelectItem>
                   <SelectItem value="confirmada">Confirmada</SelectItem>
@@ -852,16 +656,10 @@ export function ConsultasMTTab() {
               </Select>
             </div>
 
-            {/* Resultado */}
             <div className="space-y-2">
               <Label>Resultado</Label>
-              <Select
-                value={formData.resultado}
-                onValueChange={(value) => setFormData({ ...formData, resultado: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o resultado..." />
-                </SelectTrigger>
+              <Select value={formData.resultado} onValueChange={(value) => setFormData({ ...formData, resultado: value })}>
+                <SelectTrigger><SelectValue placeholder="Selecione o resultado..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="apto">Apto</SelectItem>
                   <SelectItem value="apto_com_recomendacoes">Apto com Recomendações</SelectItem>
@@ -871,22 +669,15 @@ export function ConsultasMTTab() {
               </Select>
             </div>
 
-            {/* Notas */}
             <div className="space-y-2">
               <Label>Notas</Label>
-              <Textarea
-                value={formData.notas}
-                onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-                placeholder="Observações da consulta..."
-                rows={3}
-              />
+              <Textarea value={formData.notas} onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                placeholder="Observações da consulta..." rows={3} />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {editingConsulta ? 'Guardar' : 'Criar'}
@@ -895,7 +686,6 @@ export function ConsultasMTTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <DeleteConfirmationDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}

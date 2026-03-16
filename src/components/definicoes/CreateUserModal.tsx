@@ -18,9 +18,9 @@ interface CreateUserModalProps {
 
 const roleLabels: Record<AppRole, string> = {
     admin: 'Administrador',
-    manager: 'Gestor',
-    staff: 'Colaborador',
-    viewer: 'Visualizador',
+    gestor: 'Gestor',
+    colaborador: 'Colaborador',
+    visualizador: 'Visualizador',
 };
 
 export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserModalProps) {
@@ -28,7 +28,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
     const [nome, setNome] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [role, setRole] = useState<AppRole>('viewer');
+    const [role, setRole] = useState<AppRole>('visualizador');
     const [sendWelcome, setSendWelcome] = useState(true);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -53,8 +53,6 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
         setLoading(true);
 
         try {
-            // Step 1: Create user directly via Admin RPC (bypasses "Signups not allowed")
-            // This function handlesauth.users, auth.identities, roles, and profiles atomically.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data: createdUserId, error: authError } = await (supabase.rpc as any)('admin_create_user', {
                 email_str: email.trim().toLowerCase(),
@@ -66,7 +64,6 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
             if (authError) throw new Error(authError.message);
             if (!createdUserId) throw new Error('Utilizador não foi criado corretamente.');
 
-            // Wait briefly for the UI to be ready to fetch
             await new Promise(resolve => setTimeout(resolve, 800));
 
             toast({
@@ -74,11 +71,10 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                 description: `${nome} foi adicionado como ${roleLabels[role]}.`,
             });
 
-            // Reset form
             setEmail('');
             setNome('');
             setPassword('');
-            setRole('viewer');
+            setRole('visualizador');
             setSendWelcome(true);
             onOpenChange(false);
             onSuccess();
@@ -99,7 +95,7 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
             setEmail('');
             setNome('');
             setPassword('');
-            setRole('viewer');
+            setRole('visualizador');
             setSendWelcome(true);
             setErrors({});
             onOpenChange(false);
@@ -117,7 +113,6 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                 </DialogHeader>
 
                 <div className="space-y-4 py-2">
-                    {/* Nome */}
                     <div className="space-y-1.5">
                         <Label htmlFor="create-nome">Nome completo *</Label>
                         <Input
@@ -130,7 +125,6 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                         {errors.nome && <p className="text-xs text-destructive">{errors.nome}</p>}
                     </div>
 
-                    {/* Email */}
                     <div className="space-y-1.5">
                         <Label htmlFor="create-email">Email *</Label>
                         <Input
@@ -144,7 +138,6 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                         {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                     </div>
 
-                    {/* Password */}
                     <div className="space-y-1.5">
                         <Label htmlFor="create-password">Password temporária *</Label>
                         <div className="relative">
@@ -168,7 +161,6 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                         {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
                     </div>
 
-                    {/* Role */}
                     <div className="space-y-1.5">
                         <Label htmlFor="create-role">Permissão</Label>
                         <Select value={role} onValueChange={(v: AppRole) => setRole(v)} disabled={loading}>
@@ -176,15 +168,14 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="viewer">Visualizador — só leitura</SelectItem>
-                                <SelectItem value="staff">Colaborador — ver e editar consultas</SelectItem>
-                                <SelectItem value="manager">Gestor — gerir dados, sem admin</SelectItem>
+                                <SelectItem value="visualizador">Visualizador — só leitura</SelectItem>
+                                <SelectItem value="colaborador">Colaborador — ver e editar consultas</SelectItem>
+                                <SelectItem value="gestor">Gestor — gerir dados, sem admin</SelectItem>
                                 <SelectItem value="admin">Administrador — acesso total</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
-                    {/* Send welcome email */}
                     <div className="flex items-center gap-2 pt-1">
                         <Checkbox
                             id="send-welcome"

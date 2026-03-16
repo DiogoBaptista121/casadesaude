@@ -84,14 +84,14 @@ function AppRoutes() {
     <Routes>
       <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
       <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-      <Route path="/cartao-saude" element={<RoleProtectedRoute allowedRoles={['admin', 'manager', 'staff']}><CartaoSaudePage /></RoleProtectedRoute>} />
-      <Route path="/consultas" element={<RoleProtectedRoute allowedRoles={['admin', 'manager', 'staff']}><ConsultasPage /></RoleProtectedRoute>} />
+      <Route path="/cartao-saude" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor', 'colaborador']}><CartaoSaudePage /></RoleProtectedRoute>} />
+      <Route path="/consultas" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor', 'colaborador']}><ConsultasPage /></RoleProtectedRoute>} />
       <Route path="/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
       <Route path="/horarios-locais" element={<ProtectedRoute><HorariosLocaisPage /></ProtectedRoute>} />
       <Route path="/agenda-unidade-movel" element={<ProtectedRoute><AgendaUnidadeMovelPage /></ProtectedRoute>} />
-      <Route path="/medicina-trabalho" element={<RoleProtectedRoute allowedRoles={['admin', 'manager', 'staff']}><MedicinaTrabalhoPage /></RoleProtectedRoute>} />
-      <Route path="/dashboard" element={<RoleProtectedRoute allowedRoles={['admin', 'manager', 'staff']}><DashboardPage /></RoleProtectedRoute>} />
-      <Route path="/importar-exportar" element={<RoleProtectedRoute allowedRoles={['admin', 'manager', 'staff']}><ImportarExportarPage /></RoleProtectedRoute>} />
+      <Route path="/medicina-trabalho" element={<RoleProtectedRoute allowedRoles={['admin']}><MedicinaTrabalhoPage /></RoleProtectedRoute>} />
+      <Route path="/dashboard" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor']}><DashboardPage /></RoleProtectedRoute>} />
+      <Route path="/importar-exportar" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor']}><ImportarExportarPage /></RoleProtectedRoute>} />
       <Route path="/definicoes" element={<ProtectedRoute><DefinicoesPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>

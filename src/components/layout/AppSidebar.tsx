@@ -40,13 +40,12 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
-  { title: 'Início', url: '/', icon: Home, roles: ['admin', 'manager', 'staff', 'viewer'] },
-  { title: 'Cartão de Saúde', url: '/cartao-saude', icon: CreditCard, roles: ['admin', 'manager', 'staff'] },
-  { title: 'Consultas', url: '/consultas', icon: Calendar, roles: ['admin', 'manager', 'staff'] },
-  // Medicina do Trabalho is handled separately as a collapsible group
-  { title: 'Dashboard', url: '/dashboard', icon: BarChart3, roles: ['admin', 'manager'] },
-  { title: 'Importar/Exportar', url: '/importar-exportar', icon: FileSpreadsheet, roles: ['admin', 'manager'] },
-  { title: 'Definições', url: '/definicoes', icon: Settings, roles: ['admin', 'manager', 'staff', 'viewer'] },
+  { title: 'Início', url: '/', icon: Home, roles: ['admin', 'gestor', 'colaborador', 'visualizador'] },
+  { title: 'Cartão de Saúde', url: '/cartao-saude', icon: CreditCard, roles: ['admin', 'gestor', 'colaborador'] },
+  { title: 'Consultas', url: '/consultas', icon: Calendar, roles: ['admin', 'gestor', 'colaborador'] },
+  { title: 'Dashboard', url: '/dashboard', icon: BarChart3, roles: ['admin', 'gestor'] },
+  { title: 'Importar/Exportar', url: '/importar-exportar', icon: FileSpreadsheet, roles: ['admin', 'gestor'] },
+  { title: 'Definições', url: '/definicoes', icon: Settings, roles: ['admin', 'gestor', 'colaborador', 'visualizador'] },
 ];
 
 const calendarioSubItems = [
@@ -69,7 +68,7 @@ export function AppSidebar() {
   const [pendingCartoes, setPendingCartoes] = useState(0);
 
   useEffect(() => {
-    if (role === 'admin' || role === 'manager') {
+    if (role === 'admin' || role === 'gestor') {
       const fetchPending = async () => {
         const { count } = await supabase
           .from('cartao_saude')
@@ -79,7 +78,6 @@ export function AppSidebar() {
       };
       fetchPending();
 
-      // Subscribe to changes in cartao_saude table
       const channel = supabase
         .channel('cartoes-validacao')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'cartao_saude' }, fetchPending)
@@ -89,18 +87,17 @@ export function AppSidebar() {
     }
   }, [role]);
 
-
-  // Calendário submenu open if either child is active, or can be toggled
   const isCalendarioActive =
-    location.pathname === '/calendario' || location.pathname === '/horarios-locais' || location.pathname === '/agenda-unidade-movel';
+    location.pathname === '/calendario' ||
+    location.pathname === '/horarios-locais' ||
+    location.pathname === '/agenda-unidade-movel';
   const [calendarioOpen, setCalendarioOpen] = useState(isCalendarioActive);
 
-  // Medicina do Trabalho submenu
   const isMedicinaActive = location.pathname === '/medicina-trabalho';
   const [medicinaOpen, setMedicinaOpen] = useState(isMedicinaActive);
 
   const visibleMenuItems = menuItems.filter(
-    (item) => !item.roles || item.roles.includes(role || 'viewer')
+    (item) => !item.roles || item.roles.includes(role || 'visualizador')
   );
 
   const getInitials = (nome: string | null) => {
@@ -111,9 +108,9 @@ export function AppSidebar() {
   const getRoleLabel = (r: string | null) => {
     switch (r) {
       case 'admin': return 'Administrador';
-      case 'manager': return 'Gestor';
-      case 'staff': return 'Colaborador';
-      case 'viewer': return 'Visualizador';
+      case 'gestor': return 'Gestor';
+      case 'colaborador': return 'Colaborador';
+      case 'visualizador': return 'Visualizador';
       default: return 'Utilizador';
     }
   };
@@ -154,21 +151,13 @@ export function AppSidebar() {
                       >
                         <item.icon className={cn('w-5 h-5 flex-shrink-0', isActive ? 'text-white' : 'text-white/70')} />
                         {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
-                        {!isCollapsed && item.title === 'Cartão de Saúde' && pendingCartoes > 0 && (
-                          <span className="flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-blue-500 rounded-full">
-                            {pendingCartoes}
-                          </span>
-                        )}
-                        {isCollapsed && item.title === 'Cartão de Saúde' && pendingCartoes > 0 && (
-                          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full"></span>
-                        )}
                       </RouterNavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
               })}
 
-              {/* 2. Calendário group (with submenu) */}
+              {/* 2. Calendário group */}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   onClick={() => !isCollapsed && setCalendarioOpen((o) => !o)}
@@ -182,17 +171,11 @@ export function AppSidebar() {
                   {!isCollapsed && (
                     <>
                       <span className="truncate flex-1">Calendário</span>
-                      <ChevronDown
-                        className={cn(
-                          'w-4 h-4 text-white/60 transition-transform duration-200',
-                          calendarioOpen && 'rotate-180'
-                        )}
-                      />
+                      <ChevronDown className={cn('w-4 h-4 text-white/60 transition-transform duration-200', calendarioOpen && 'rotate-180')} />
                     </>
                   )}
                 </SidebarMenuButton>
 
-                {/* Calendário Sub-items */}
                 {!isCollapsed && calendarioOpen && (
                   <SidebarMenuSub className="ml-2 mt-1 space-y-0.5">
                     {calendarioSubItems.map((sub) => {
@@ -218,7 +201,6 @@ export function AppSidebar() {
                   </SidebarMenuSub>
                 )}
 
-                {/* Calendário Collapsed: show sub-items as icons only */}
                 {isCollapsed && (
                   <SidebarMenuSub className="mt-1 space-y-0.5">
                     {calendarioSubItems.map((sub) => {
@@ -245,7 +227,7 @@ export function AppSidebar() {
                 )}
               </SidebarMenuItem>
 
-              {/* 3. Medicina do Trabalho group (ADMIN ONLY) */}
+              {/* 3. Medicina do Trabalho — só admin */}
               {role === 'admin' && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -260,17 +242,11 @@ export function AppSidebar() {
                     {!isCollapsed && (
                       <>
                         <span className="truncate flex-1">Medicina do Trabalho</span>
-                        <ChevronDown
-                          className={cn(
-                            'w-4 h-4 text-white/60 transition-transform duration-200',
-                            medicinaOpen && 'rotate-180'
-                          )}
-                        />
+                        <ChevronDown className={cn('w-4 h-4 text-white/60 transition-transform duration-200', medicinaOpen && 'rotate-180')} />
                       </>
                     )}
                   </SidebarMenuButton>
 
-                  {/* Medicina Sub-items expanded */}
                   {!isCollapsed && medicinaOpen && (
                     <SidebarMenuSub className="ml-2 mt-1 space-y-0.5">
                       {medicinaSubItems.map((sub) => {
@@ -301,7 +277,6 @@ export function AppSidebar() {
                     </SidebarMenuSub>
                   )}
 
-                  {/* Medicina Collapsed: icons only */}
                   {isCollapsed && (
                     <SidebarMenuSub className="mt-1 space-y-0.5">
                       {medicinaSubItems.map((sub) => {
@@ -334,7 +309,7 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
-              {/* 4. Other items (Dashboard, Expor/Importar, Consultas, Cartão de Saúde if they exist and are visible) */}
+              {/* 4. Restantes itens (exceto Início e Definições) */}
               {visibleMenuItems.filter(i => i.title !== 'Início' && i.title !== 'Definições').map((item) => {
                 const isActive = location.pathname === item.url || (item.url !== '/' && location.pathname.startsWith(item.url));
                 return (
@@ -364,7 +339,7 @@ export function AppSidebar() {
                 );
               })}
 
-              {/* 5. Definições (Spacer added to push it or just visually separate if needed. The use of mt-auto can be done on the menuItem if we want it at the bottom, but we'll stick to flow) */}
+              {/* 5. Definições */}
               <div className="pt-2 mt-2 border-t border-white/10" />
               {visibleMenuItems.filter(i => i.title === 'Definições').map((item) => {
                 const isActive = location.pathname === item.url || (item.url !== '/' && location.pathname.startsWith(item.url));
@@ -381,14 +356,6 @@ export function AppSidebar() {
                       >
                         <item.icon className={cn('w-5 h-5 flex-shrink-0', isActive ? 'text-white' : 'text-white/70')} />
                         {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
-                        {!isCollapsed && item.title === 'Cartão de Saúde' && pendingCartoes > 0 && (
-                          <span className="flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-blue-500 rounded-full">
-                            {pendingCartoes}
-                          </span>
-                        )}
-                        {isCollapsed && item.title === 'Cartão de Saúde' && pendingCartoes > 0 && (
-                          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full"></span>
-                        )}
                       </RouterNavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

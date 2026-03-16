@@ -1,11 +1,11 @@
 // Casa de Saúde - Database Types
 
-export type AppRole = 'admin' | 'manager' | 'staff' | 'viewer';
+export type AppRole = 'admin' | 'gestor' | 'colaborador' | 'visualizador';
 export type ConsultaStatus = 'agendada' | 'confirmada' | 'concluida' | 'cancelada' | 'falta' | 'remarcada';
 export type ConsultaOrigem = 'casa_saude' | 'unidade_movel';
 export type EstadoRegisto = 'ativo' | 'inativo';
 export type DocumentoTipo = 'CC' | 'BI';
-export type EstadoEntrega = 'ENTREGUE' | 'NAO_ENTREGUE' | 'PENDENTE' | 'CANCELADO' | 'AGUARDAR_VALIDACAO';
+export type EstadoEntrega = 'ENTREGUE' | 'NAO_ENTREGUE' | 'PENDENTE' | 'CANCELADO' | 'AGUARDAR_VALIDACAO' | 'ERRO_DADOS' | 'EXPIRADO';
 
 export interface Profile {
   id: string;
@@ -239,6 +239,8 @@ export const estadoEntregaLabels: Record<EstadoEntrega, string> = {
   PENDENTE: 'Pendente',
   CANCELADO: 'Cancelado',
   AGUARDAR_VALIDACAO: 'Aguardar Validação',
+  ERRO_DADOS: 'Erro nos Dados',
+  EXPIRADO: 'Expirado',
 };
 
 export const estadoEntregaColors: Record<EstadoEntrega, string> = {
@@ -247,4 +249,6 @@ export const estadoEntregaColors: Record<EstadoEntrega, string> = {
   PENDENTE: 'badge-agendada',
   CANCELADO: 'badge-cancelada',
   AGUARDAR_VALIDACAO: 'badge-remarcada',
+  ERRO_DADOS: 'badge-falta',
+  EXPIRADO: 'badge-falta',
 };

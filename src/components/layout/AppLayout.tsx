@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { Toaster } from '@/components/ui/sonner';
 
+
 interface AppLayoutProps {
   children: React.ReactNode;
 }

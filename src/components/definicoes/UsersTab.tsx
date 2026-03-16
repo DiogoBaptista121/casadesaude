@@ -25,16 +25,16 @@ interface UserWithRole {
 
 const roleLabels: Record<AppRole, string> = {
   admin: 'Administrador',
-  manager: 'Gestor',
-  staff: 'Colaborador',
-  viewer: 'Visualizador',
+  gestor: 'Gestor',
+  colaborador: 'Colaborador',
+  visualizador: 'Visualizador',
 };
 
 const roleBadgeColors: Record<AppRole, string> = {
   admin: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  manager: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  staff: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  viewer: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
+  gestor: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  colaborador: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  visualizador: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
 };
 
 export function UsersTab() {
@@ -46,12 +46,10 @@ export function UsersTab() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
-  // Modal state
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
 
-  // Delete state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserWithRole | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -64,7 +62,6 @@ export function UsersTab() {
     setLoading(true);
     setLoadError(null);
     try {
-      // Use SECURITY DEFINER function — bypasses RLS, verifies admin server-side
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase.rpc as any)('get_all_users');
 
@@ -198,7 +195,6 @@ export function UsersTab() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Load error */}
           {loadError && (
             <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -209,7 +205,6 @@ export function UsersTab() {
             </div>
           )}
 
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -220,7 +215,6 @@ export function UsersTab() {
             />
           </div>
 
-          {/* Table */}
           {filteredUsers.length === 0 ? (
             <EmptyState
               title={search ? 'Sem resultados' : 'Sem utilizadores'}
@@ -249,9 +243,9 @@ export function UsersTab() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">{user.email}</TableCell>
                         <TableCell>
-                          <Badge className={roleBadgeColors[user.role || 'viewer']}>
+                          <Badge className={roleBadgeColors[user.role || 'visualizador']}>
                             <Shield className="mr-1 h-3 w-3" />
-                            {roleLabels[user.role || 'viewer']}
+                            {roleLabels[user.role || 'visualizador']}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -261,7 +255,6 @@ export function UsersTab() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-end gap-1">
-                            {/* Edit */}
                             <Button
                               variant="ghost" size="icon" className="h-8 w-8"
                               title="Editar utilizador"
@@ -270,7 +263,6 @@ export function UsersTab() {
                               <Pencil className="h-4 w-4" />
                             </Button>
 
-                            {/* Toggle active (not self) */}
                             {!isSelf && (
                               <Button
                                 variant="ghost" size="icon" className="h-8 w-8"
@@ -284,7 +276,6 @@ export function UsersTab() {
                               </Button>
                             )}
 
-                            {/* Delete (not self) */}
                             {!isSelf && (
                               <Button
                                 variant="ghost" size="icon"

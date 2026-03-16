@@ -3,9 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 export interface Permissions {
     // Role flags
     isAdmin: boolean;
-    isManager: boolean;
-    isStaff: boolean;
-    isViewer: boolean;
+    isGestor: boolean;
+    isColaborador: boolean;
+    isVisualizador: boolean;
 
     // User management
     canCreateUsers: boolean;
@@ -23,44 +23,42 @@ export interface Permissions {
 }
 
 /**
- * Hook that returns granular permission flags based on the current user's role.
- *
  * Role hierarchy:
- *   admin    → full access
- *   manager  → can edit data, cannot manage users or advanced settings
- *   staff    → can view/edit assigned data, cannot delete
- *   viewer   → read-only
+ *   admin        → acesso total
+ *   gestor       → pode ver dashboard e editar dados, não gere utilizadores
+ *   colaborador  → pode criar cartões e marcar consultas, não pode apagar
+ *   visualizador → só leitura
  */
 export function usePermissions(): Permissions {
     const { role } = useAuth();
 
     const isAdmin = role === 'admin';
-    const isManager = role === 'manager';
-    const isStaff = role === 'staff';
-    const isViewer = role === 'viewer';
+    const isGestor = role === 'gestor';
+    const isColaborador = role === 'colaborador';
+    const isVisualizador = role === 'visualizador';
 
     return {
         isAdmin,
-        isManager,
-        isStaff,
-        isViewer,
+        isGestor,
+        isColaborador,
+        isVisualizador,
 
-        // Only admin can manage users
+        // Só admin gere utilizadores
         canCreateUsers: isAdmin,
         canEditUsers: isAdmin,
         canDeleteUsers: isAdmin,
         canManageUsers: isAdmin,
 
-        // Admin, manager, staff can edit data
-        canEdit: isAdmin || isManager || isStaff,
+        // Admin, gestor e colaborador podem criar/editar
+        canEdit: isAdmin || isGestor || isColaborador,
 
-        // Only admin can delete records
+        // Só admin pode apagar registos
         canDelete: isAdmin,
 
-        // Only admin can view audit logs
+        // Só admin vê logs de auditoria
         canViewAudit: isAdmin,
 
-        // Admin and manager can access general settings
-        canEditSettings: isAdmin || isManager,
+        // Admin e gestor acedem às definições gerais
+        canEditSettings: isAdmin || isGestor,
     };
 }

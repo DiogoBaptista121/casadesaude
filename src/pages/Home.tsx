@@ -96,7 +96,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { profile, canEdit, role } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [kpis, setKpis] = useState({ consultasHoje: 0, totalCartoes: 0, localHoje: 0, pendentes: 0, pendentesValidacao: 0 });
+  const [kpis, setKpis] = useState({ consultasHoje: 0, totalCartoes: 0, localHoje: 0, pendentes: 0, pendentesValidacao: 0, errosDados: 0, expirados: 0 });
   const [agendaHoje, setAgendaHoje] = useState<AgendaItem[]>([]);
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
 
@@ -124,13 +124,17 @@ export default function HomePage() {
       // @ts-ignore
       const q5 = supabase.from('cartao_saude').select('id', { count: 'exact', head: true }).eq('estado_entrega', 'AGUARDAR_VALIDACAO');
       // @ts-ignore
+      const qErr = supabase.from('cartao_saude').select('id', { count: 'exact', head: true }).eq('estado_entrega', 'ERRO_DADOS');
+      // @ts-ignore
+      const qExp = supabase.from('cartao_saude').select('id', { count: 'exact', head: true }).eq('estado_entrega', 'EXPIRADO');
+      // @ts-ignore
       const q6 = supabase.from('consultas').select('id, hora, paciente_nif, status, local, servicos(nome, cor)').eq('data', today).order('hora', { ascending: true }).limit(10);
       // @ts-ignore
       const q7 = supabase.from('consultas').select('data').gte('data', dateRange[0]).lte('data', dateRange[6]);
       // @ts-ignore
       const q8 = supabase.from('cartao_saude').select('created_at').gte('created_at', dateRange[0]).lte('created_at', dateRange[6] + 'T23:59:59');
 
-      const [totalRes, pendentesRes, hojeRes, movelRes, validacaoRes, agendaRes, consultasWeekRes, cartoesWeekRes] = await Promise.all([q1, q2, q3, q4, q5, q6, q7, q8]);
+      const [totalRes, pendentesRes, hojeRes, movelRes, validacaoRes, errRes, expRes, agendaRes, consultasWeekRes, cartoesWeekRes] = await Promise.all([q1, q2, q3, q4, q5, qErr, qExp, q6, q7, q8]);
 
       setKpis({
         consultasHoje: hojeRes.count ?? 0,
@@ -138,6 +142,8 @@ export default function HomePage() {
         localHoje: movelRes.count ?? 0,
         pendentes: pendentesRes.count ?? 0,
         pendentesValidacao: validacaoRes.count ?? 0,
+        errosDados: errRes.count ?? 0,
+        expirados: expRes.count ?? 0,
       });
 
       const consultasByDay: Record<string, number> = {};
@@ -195,14 +201,52 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── Admin Validation Alert ────────────────────────────────────── */}
-      {(role === 'admin' || role === 'manager') && kpis.pendentesValidacao > 0 && (
-        <div className="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-blue-600" />
-            <p className="text-sm text-blue-900 dark:text-blue-200">Tens <strong>{kpis.pendentesValidacao}</strong> cartões para validar.</p>
-          </div>
-          <Button onClick={() => navigate('/cartao-saude?filter=validacao')} size="sm">Rever</Button>
+      {/* ── Centro de Tarefas (Notificações) ────────────────────────── */}
+      {(role === 'admin' || role === 'gestor') && (
+        <div className="bg-card rounded-2xl border p-5 shadow-sm mt-6">
+          <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-md bg-muted text-muted-foreground">
+              <AlertTriangle className="w-3.5 h-3.5" />
+            </span>
+            Centro de Tarefas
+          </h2>
+          {loading ? (
+            <Skeleton className="h-[68px] w-full" />
+          ) : (kpis.pendentesValidacao === 0 && kpis.errosDados === 0 && kpis.expirados === 0) ? (
+            <div className="flex items-center justify-center py-6">
+              <p className="text-sm text-muted-foreground">Tudo em dia. Nenhuma ação pendente.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {kpis.pendentesValidacao > 0 && (
+                <button onClick={() => navigate('/cartao-saude?filter=validacao')} className="flex items-center gap-3 p-3 rounded-xl border border-blue-100 hover:bg-blue-50/50 bg-blue-50/20 text-left transition-colors dark:border-blue-900/50 dark:bg-blue-900/10 dark:hover:bg-blue-900/30">
+                  <div className="text-xl">🔵</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-blue-600/80 dark:text-blue-400 font-bold uppercase tracking-wider mb-0.5">Aprovação</p>
+                    <p className="text-sm text-blue-900 dark:text-blue-100 font-semibold truncate">{kpis.pendentesValidacao} {kpis.pendentesValidacao === 1 ? 'Cartão Aguarda' : 'Cartões Aguardam'} Validação</p>
+                  </div>
+                </button>
+              )}
+              {kpis.errosDados > 0 && (
+                <button onClick={() => navigate('/cartao-saude?filter=erros')} className="flex items-center gap-3 p-3 rounded-xl border border-orange-100 hover:bg-orange-50/50 bg-orange-50/20 text-left transition-colors dark:border-orange-900/50 dark:bg-orange-900/10 dark:hover:bg-orange-900/30">
+                  <div className="text-xl">🟠</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-orange-600/80 dark:text-orange-400 font-bold uppercase tracking-wider mb-0.5">Incompletos</p>
+                    <p className="text-sm text-orange-900 dark:text-orange-100 font-semibold truncate">{kpis.errosDados} {kpis.errosDados === 1 ? 'Cartão com Erro' : 'Cartões com Erros'} nos Dados</p>
+                  </div>
+                </button>
+              )}
+              {kpis.expirados > 0 && (
+                <button onClick={() => navigate('/cartao-saude?filter=expirados')} className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 bg-muted/20 text-left transition-colors">
+                  <div className="text-xl">⚫</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Renovação</p>
+                    <p className="text-sm text-foreground font-semibold truncate">{kpis.expirados} {kpis.expirados === 1 ? 'Cartão Expirado' : 'Cartões Expirados'}</p>
+                  </div>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

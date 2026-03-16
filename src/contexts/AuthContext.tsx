@@ -13,8 +13,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, nome: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
-  isManager: boolean;
-  isStaff: boolean;
+  isGestor: boolean;
+  isColaborador: boolean;
   canEdit: boolean;
 }
 
@@ -27,20 +27,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  /**
-   * Uses a SECURITY DEFINER function to fetch profile + role in one call.
-   * This bypasses RLS entirely, so it always works regardless of policy state.
-   */
   const fetchUserData = async (userId: string) => {
     console.log('[Auth] fetchUserData for:', userId);
     try {
-      // Try the SECURITY DEFINER function first (bypasses RLS)
-      // @ts-ignore — get_my_profile exists in the DB but is not in the stale generated types
       const { data, error } = await (supabase.rpc as any)('get_my_profile');
 
       if (error) {
-        console.warn('[Auth] get_my_profile RPC failed, falling back to direct queries:', error.message);
-        // Fallback: direct table queries
+        console.warn('[Auth] get_my_profile RPC failed, falling back:', error.message);
         await fetchUserDataFallback(userId);
         return;
       }
@@ -70,7 +63,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  /** Direct table queries fallback — does NOT touch user_roles to avoid RLS recursion */
   const fetchUserDataFallback = async (userId: string) => {
     console.log('[Auth] Using fallback direct queries for:', userId);
 
@@ -87,18 +79,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(profileData as Profile);
     }
 
-    // ⚠️  Do NOT query user_roles directly — it triggers infinite RLS recursion.
-    // Instead, read the role from the JWT session claims (app_metadata.role),
-    // which Supabase populates via the custom claims hook without any table read.
     const { data: { session: currentSession } } = await supabase.auth.getSession();
     const jwtRole = (currentSession?.user?.app_metadata?.role as AppRole) ?? null;
     if (jwtRole) {
       console.log('[Auth] Role from JWT claim (fallback):', jwtRole);
       setRole(jwtRole);
     } else {
-      // Last resort: the user is authenticated but role couldn't be determined.
-      // Default to null (lowest privilege) — the UI will show read-only access.
-      console.warn('[Auth] No role found in JWT claims — defaulting to null (viewer)');
+      console.warn('[Auth] No role found in JWT — defaulting to null (visualizador)');
       setRole(null);
     }
   };
@@ -113,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fetchUserData(userId);
     };
 
-    // 1. Check for existing session immediately
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
       if (!isMounted) return;
       console.log('[Auth] getSession — user:', existingSession?.user?.id ?? 'none');
@@ -127,7 +113,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // 2. Listen for auth state changes (sign in / sign out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
         if (!isMounted) return;
@@ -137,11 +122,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(currentSession?.user ?? null);
 
         if (event === 'SIGNED_IN' && currentSession?.user && !hasFetched) {
-          // Only fetch if getSession didn't already trigger it
           setLoading(true);
           setTimeout(() => doFetch(currentSession.user.id), 100);
         } else if (event === 'SIGNED_IN' && currentSession?.user && hasFetched) {
-          // Re-fetch on explicit sign in (e.g. after login page)
           setLoading(true);
           setTimeout(() => {
             hasFetched = false;
@@ -153,7 +136,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
           hasFetched = false;
         } else if (event === 'TOKEN_REFRESHED' && currentSession?.user) {
-          // Token refreshed — re-fetch to ensure data is current
           setTimeout(() => doFetch(currentSession.user.id), 100);
         }
       }
@@ -188,16 +170,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRole(null);
   };
 
+  // ✅ Roles atualizadas
   const isAdmin = role === 'admin';
-  const isManager = role === 'manager';
-  const isStaff = role === 'staff';
-  const canEdit = isAdmin || isManager || isStaff;
+  const isGestor = role === 'gestor';
+  const isColaborador = role === 'colaborador';
+  const canEdit = isAdmin || isGestor || isColaborador;
 
   return (
     <AuthContext.Provider value={{
       user, session, profile, role, loading,
       signIn, signUp, signOut,
-      isAdmin, isManager, isStaff, canEdit,
+      isAdmin, isGestor, isColaborador, canEdit,
     }}>
       {children}
     </AuthContext.Provider>
