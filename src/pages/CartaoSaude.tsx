@@ -15,7 +15,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Edit2, Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Edit2, Loader2, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CartaoSaude, EstadoEntrega } from '@/types/database';
 
@@ -191,6 +191,19 @@ export default function CartaoSaudePage() {
     setBulkDeleting(false);
   };
 
+  // Aprovar selecionados em massa
+  const handleBulkAprovar = async () => {
+    if (selectedIds.length === 0) return;
+    setSaving(true);
+    const { error } = await supabase.from('cartao_saude').update({ estado_entrega: 'ENTREGUE' }).in('id', selectedIds);
+    if (!error) {
+      toast.success('Cartões validados com sucesso!');
+      setSelectedIds([]);
+      fetchPage();
+    } else toast.error(error.message);
+    setSaving(false);
+  };
+
   // Delete todos (filtrados)
   const handleDeleteAll = async () => {
     setDeletingAll(true);
@@ -268,57 +281,71 @@ export default function CartaoSaudePage() {
 
   return (
     <div className="flex flex-col h-full gap-3">
+      {/* BLOCO 1: PageHeader */}
       <PageHeader title="Cartão de Saúde" description="Gestão de aderentes">
-        <div className="flex gap-2">
-          <Button onClick={() => { setEditingCartao(null); setFormData({ estado_entrega: 'PENDENTE' }); setModalOpen(true); }}>
-            <Plus className="w-4 h-4 mr-2" /> Novo Cartão
+        <div className="flex items-center gap-3">
+          <Button className="h-10 gap-2 shrink-0 shadow-sm" onClick={() => { setEditingCartao(null); setFormData({ estado_entrega: 'PENDENTE' }); setModalOpen(true); }}>
+            <Plus className="w-4 h-4" /> Novo Cartão
           </Button>
         </div>
       </PageHeader>
 
-      {/* Filtros e Ações Rápidas */}
-      <div className="flex flex-wrap items-center gap-3">
-        {isSuperAdmin && (
-          <Button 
-            size="sm"
-            variant={estadoFilter === 'requer_atencao' ? 'default' : 'outline'} 
-            className={estadoFilter === 'requer_atencao' ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600' : 'border-indigo-300 text-indigo-700 hover:bg-indigo-50'}
-            onClick={() => setEstadoFilter(estadoFilter === 'requer_atencao' ? 'todos' : 'requer_atencao')}
-          >
-            <AlertTriangle className="w-4 h-4 mr-2" /> Requer Atenção
-          </Button>
-        )}
-
-        <div className="relative flex-1 min-w-[200px]">
+      {/* BLOCO 2: Barra de Filtros */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center shrink-0 w-full">
+        <div className="relative w-full sm:max-w-sm shrink-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Pesquisar por NIF ou Nome..." value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+            onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 h-10 shadow-sm" />
         </div>
 
         <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Filtrar Estado" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-44 h-10 shadow-sm shrink-0"><SelectValue placeholder="Filtrar Estado" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos os estados</SelectItem>
             {Object.entries(estadoEntregaLabelsMap).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
 
-        {isSuperAdmin && selectedIds.length > 0 && (
-          <Button variant="destructive" onClick={() => setBulkDeleteDialogOpen(true)}>
-            <Trash2 className="w-4 h-4 mr-2" /> Eliminar Selecionados
+        {isSuperAdmin && (
+          <Button 
+            variant={estadoFilter === 'requer_atencao' ? 'default' : 'outline'} 
+            className={`h-10 gap-2 shadow-sm ${estadoFilter === 'requer_atencao' ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600' : 'border-indigo-300 text-indigo-700 hover:bg-indigo-50'}`}
+            onClick={() => setEstadoFilter(estadoFilter === 'requer_atencao' ? 'todos' : 'requer_atencao')}
+          >
+            <AlertTriangle className="w-4 h-4" /> Requer Atenção
           </Button>
+        )}
+
+        {isSuperAdmin && selectedIds.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-3 shrink-0 sm:ml-auto w-full sm:w-auto">
+            <Button
+              className="h-10 gap-2 shadow-sm bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto"
+              onClick={handleBulkAprovar}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+              Aprovar ({selectedIds.length})
+            </Button>
+            <Button variant="destructive" className="h-10 gap-2 shadow-sm shrink-0 w-full sm:w-auto" onClick={() => setBulkDeleteDialogOpen(true)}>
+              <Trash2 className="w-4 h-4" /> Eliminar ({selectedIds.length})
+            </Button>
+          </div>
         )}
       </div>
 
-      <DataTable columns={columns} data={cartoes} loading={loading} />
-
-      {/* Rodapé contador */}
-      {!loading && (
-        <div className="flex items-center justify-between px-1 py-1.5 text-xs text-muted-foreground border-t">
-          <span>A mostrar <span className="font-semibold text-foreground">{cartoes.length}</span> cartões</span>
-          {selectedIds.length > 0 && <span className="text-primary font-medium">{selectedIds.length} selecionado(s)</span>}
+      {/* BLOCO 3: Card da Tabela */}
+      <div className="bg-card border border-border/50 rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col">
+        <div className="flex-1 overflow-auto">
+          <DataTable columns={columns} data={cartoes} loading={loading} />
         </div>
-      )}
+        {/* Rodapé contador */}
+        {!loading && (
+          <div className="flex items-center justify-between px-4 py-3 text-xs text-muted-foreground border-t bg-muted/20 shrink-0">
+            <span>A mostrar <span className="font-semibold text-foreground">{cartoes.length}</span> cartões</span>
+            {selectedIds.length > 0 && <span className="text-primary font-medium">{selectedIds.length} selecionado(s)</span>}
+          </div>
+        )}
+      </div>
 
       {/* Modal Criar/Editar */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

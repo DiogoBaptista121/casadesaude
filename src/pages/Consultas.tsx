@@ -639,100 +639,102 @@ export default function ConsultasPage() {
   // ------------------------------------------------------------------
   return (
     <div className="page-enter flex flex-col h-full gap-3">
+      {/* BLOCO 1: PageHeader */}
       <PageHeader title="Consultas" description="Gestão de marcações de consultas">
         {canEdit && (
-          <>
-            <Button variant="outline" onClick={handleExport} className="gap-2">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={handleExport} className="gap-2 h-10 shadow-sm">
               <FileDown className="w-4 h-4" />
               Exportar
             </Button>
-            <Button onClick={openCreateModal} className="gap-2">
+            <Button onClick={openCreateModal} className="gap-2 h-10 shadow-sm">
               <Plus className="w-4 h-4" />
               Nova Marcação
             </Button>
-          </>
+          </div>
         )}
       </PageHeader>
 
-      {/* Compact filter bar */}
-      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-        <div className="flex flex-col sm:flex-row gap-2 flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Nome, NIF, nº cartão ou serviço..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-8 text-sm"
-            />
-          </div>
+      {/* BLOCO 2: Barra de Filtros */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center shrink-0 w-full">
+        <div className="relative w-full sm:max-w-sm shrink-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            type="date"
-            value={dataFilter}
-            onChange={(e) => setDataFilter(e.target.value)}
-            className="w-full sm:w-36 h-8 text-sm"
+            placeholder="Nome, NIF, nº cartão ou serviço..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 h-10 shadow-sm"
           />
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-36 h-8 text-sm">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos Status</SelectItem>
-              <SelectItem value="agendada">Agendada</SelectItem>
-              <SelectItem value="confirmada">Confirmada</SelectItem>
-              <SelectItem value="concluida">Concluída</SelectItem>
-              <SelectItem value="cancelada">Cancelada</SelectItem>
-              <SelectItem value="falta">Falta</SelectItem>
-              <SelectItem value="remarcada">Remarcada</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-full sm:w-44 h-8 text-sm">
-              <SelectValue placeholder="Ordenar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="recentes">Mais Recentes</SelectItem>
-              <SelectItem value="nome_asc">Nome Paciente (A-Z)</SelectItem>
-              <SelectItem value="status">Status</SelectItem>
-            </SelectContent>
-          </Select>
-          {canEdit && selectedIds.length > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-1.5 h-8 text-xs shrink-0"
-              onClick={() => setBulkDeleteDialogOpen(true)}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Eliminar ({selectedIds.length})
-            </Button>
-          )}
         </div>
+        <Input
+          type="date"
+          value={dataFilter}
+          onChange={(e) => setDataFilter(e.target.value)}
+          className="w-full sm:w-40 h-10 shadow-sm"
+        />
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-40 h-10 shadow-sm">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos Status</SelectItem>
+            <SelectItem value="agendada">Agendada</SelectItem>
+            <SelectItem value="confirmada">Confirmada</SelectItem>
+            <SelectItem value="concluida">Concluída</SelectItem>
+            <SelectItem value="cancelada">Cancelada</SelectItem>
+            <SelectItem value="falta">Falta</SelectItem>
+            <SelectItem value="remarcada">Remarcada</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-44 h-10 shadow-sm">
+            <SelectValue placeholder="Ordenar" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recentes">Mais Recentes</SelectItem>
+            <SelectItem value="nome_asc">Nome Paciente (A-Z)</SelectItem>
+            <SelectItem value="status">Status</SelectItem>
+          </SelectContent>
+        </Select>
+        {canEdit && selectedIds.length > 0 && (
+          <Button
+            variant="destructive"
+            className="gap-2 h-10 shadow-sm shrink-0 sm:ml-auto w-full sm:w-auto"
+            onClick={() => setBulkDeleteDialogOpen(true)}
+          >
+            <Trash2 className="w-4 h-4" />
+            Eliminar ({selectedIds.length})
+          </Button>
+        )}
       </div>
 
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        data={filteredConsultas}
-        loading={loading}
-        emptyTitle="Sem consultas"
-        emptyDescription="Ainda não existem consultas registadas."
-        onRowClick={canEdit ? openEditModal : undefined}
-      />
-
-      {/* Count footer */}
-      {!loading && (
-        <div className="shrink-0 flex items-center justify-between px-1 py-1.5 text-xs text-muted-foreground border-t border-slate-100">
-          <span>
-            A mostrar{' '}
-            <span className="font-semibold text-foreground">{filteredConsultas.length}</span> de{' '}
-            <span className="font-semibold text-foreground">{consultas.length}</span> consultas
-          </span>
-          {selectedIds.length > 0 && (
-            <span className="text-primary font-medium">{selectedIds.length} selecionada(s)</span>
-          )}
+      {/* BLOCO 3: Card da Tabela */}
+      <div className="bg-card border border-border/50 rounded-lg shadow-sm overflow-hidden flex-1 flex flex-col">
+        <div className="flex-1 overflow-auto">
+          <DataTable
+            columns={columns}
+            data={filteredConsultas}
+            loading={loading}
+            emptyTitle="Sem consultas"
+            emptyDescription="Ainda não existem consultas registadas."
+            onRowClick={canEdit ? openEditModal : undefined}
+          />
         </div>
-      )}
+
+        {/* Count footer */}
+        {!loading && (
+          <div className="shrink-0 flex items-center justify-between px-4 py-3 text-xs text-muted-foreground border-t bg-muted/20">
+            <span>
+              A mostrar{' '}
+              <span className="font-semibold text-foreground">{filteredConsultas.length}</span> de{' '}
+              <span className="font-semibold text-foreground">{consultas.length}</span> consultas
+            </span>
+            {selectedIds.length > 0 && (
+              <span className="text-primary font-medium">{selectedIds.length} selecionada(s)</span>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Create / Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

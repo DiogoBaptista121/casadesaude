@@ -6,6 +6,7 @@ import { DataTable, Column } from '@/components/ui/data-table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHeader } from '@/components/ui/page-header';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
 import {
   Dialog,
@@ -47,17 +48,17 @@ const formatDate = (date: string | null): string => {
 
 // ─── Exam status badge ────────────────────────────────────────────
 const EXAM_BADGE: Record<ExamStatus, { label: string; className: string }> = {
-  vencido: { label: 'Vencido 🔴', className: 'bg-red-100 text-red-700 border-red-200' },
-  a_vencer: { label: 'A Vencer 🟠', className: 'bg-amber-100 text-amber-700 border-amber-200' },
-  em_dia: { label: 'Em Dia 🟢', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  sem_data: { label: 'Aguardar 1ª Consulta', className: 'bg-gray-100 text-gray-500 border-gray-200' },
+  vencido: { label: 'Vencido 🔴', className: 'bg-red-500/10 text-red-600 border-red-200/50' },
+  a_vencer: { label: 'A Vencer 🟠', className: 'bg-amber-500/10 text-amber-600 border-amber-200/50' },
+  em_dia: { label: 'Em Dia 🟢', className: 'bg-emerald-500/10 text-emerald-600 border-emerald-200/50' },
+  sem_data: { label: 'Aguardar 1ª Consulta', className: 'bg-gray-500/10 text-gray-600 border-gray-200/50' },
 };
 
 function ExamStatusBadge({ ultimoExame, dataNasc }: { ultimoExame: string | null; dataNasc: string | null }) {
   const status = getExamStatus(ultimoExame, dataNasc);
   const { label, className } = EXAM_BADGE[status];
   return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${className}`}>
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-md border ${className}`}>
       {label}
     </span>
   );
@@ -66,8 +67,8 @@ function ExamStatusBadge({ ultimoExame, dataNasc }: { ultimoExame: string | null
 
 export function FuncionariosTab() {
   const { canEdit, role } = useAuth();
-  const isViewer = role === 'viewer';
-  const canManageBulk = role === 'admin' || role === 'manager';
+  const isViewer = role === 'visualizador';
+  const canManageBulk = role === 'admin' || role === 'gestor';
   const hasEditAccess = canEdit && !isViewer;
   const { isSuperAdmin } = useSuperAdmin();
   const [loading, setLoading] = useState(true);
@@ -547,7 +548,7 @@ export function FuncionariosTab() {
       key: 'actions',
       header: '',
       cell: (item) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 justify-end">
           {hasEditAccess && (
             <Button variant="ghost" size="icon" className="h-7 w-7"
               onClick={(e) => { e.stopPropagation(); openEditModal(item); }}
@@ -569,98 +570,95 @@ export function FuncionariosTab() {
   ];
 
   return (
-    <div className="flex flex-col h-full gap-3">
-      {/* ── Dashboard Card Wrapper ───────────────────────────────── */}
-      <div className="flex flex-col flex-1 overflow-hidden bg-card rounded-xl shadow-sm border border-border">
-        {/* Filter bar */}
-        <div className="flex flex-col sm:flex-row gap-2 p-4 shrink-0 border-b border-border">
-          <div className="flex flex-col sm:flex-row gap-2 flex-1">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Pesquisar nome, número..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 h-8 text-sm"
+    <div className="flex flex-col h-full gap-5">
+      {/* BLOCO 1: PageHeader */}
+      <PageHeader title="Medicina do Trabalho" description="Gestão de funcionários da medicina do trabalho">
+        {hasEditAccess && (
+          <div className="flex items-center gap-3">
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleImport}
+                className="hidden"
               />
-            </div>
-            <Select value={ativoFilter} onValueChange={setAtivoFilter}>
-              <SelectTrigger className="w-full sm:w-28 h-8 text-sm">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="ativo">Ativos</SelectItem>
-                <SelectItem value="inativo">Inativos</SelectItem>
-              </SelectContent>
-            </Select>
-            {/* Exam status filter */}
-            <Select value={examFilter} onValueChange={setExamFilter}>
-              <SelectTrigger className="w-full sm:w-36 h-8 text-sm">
-                <SelectValue placeholder="Exame" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos Exames</SelectItem>
-                <SelectItem value="vencido">Vencidos 🔴</SelectItem>
-                <SelectItem value="a_vencer">A Vencer (30d) 🟠</SelectItem>
-                <SelectItem value="em_dia">Em Dia 🟢</SelectItem>
-                <SelectItem value="sem_data">Sem Registo</SelectItem>
-              </SelectContent>
-            </Select>
-            {/* Sort */}
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-full sm:w-48 h-8 text-sm">
-                <SelectValue placeholder="Ordenar por" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="numero_asc">Nº (Crescente)</SelectItem>
-                <SelectItem value="numero_desc">Nº (Decrescente)</SelectItem>
-                <SelectItem value="nome_asc">Nome (A-Z)</SelectItem>
-                <SelectItem value="nome_desc">Nome (Z-A)</SelectItem>
-              </SelectContent>
-            </Select>
-            {/* Bulk delete button */}
-            {isSuperAdmin && selectedIds.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                className="gap-1.5 h-8 text-xs shrink-0"
-                onClick={() => setBulkDeleteDialogOpen(true)}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Eliminar ({selectedIds.length})
+              <Button variant="outline" className="gap-2 h-10 shadow-sm" asChild>
+                <span>
+                  <FileUp className="w-4 h-4 text-muted-foreground" />
+                  Importar
+                </span>
               </Button>
-            )}
+            </label>
+            <Button variant="outline" onClick={handleExport} className="gap-2 h-10 shadow-sm">
+              <FileDown className="w-4 h-4 text-muted-foreground" />
+              Exportar
+            </Button>
+            <Button onClick={openCreateModal} className="gap-2 h-10 shadow-sm">
+              <Plus className="w-4 h-4" />
+              Novo Funcionário
+            </Button>
           </div>
+        )}
+      </PageHeader>
 
-          {hasEditAccess && (
-            <div className="flex gap-2 shrink-0">
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleImport}
-                  className="hidden"
-                />
-                <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" asChild>
-                  <span>
-                    <FileUp className="w-3.5 h-3.5" />
-                    Importar
-                  </span>
-                </Button>
-              </label>
-              <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5 h-8 text-xs">
-                <FileDown className="w-3.5 h-3.5" />
-                Exportar
-              </Button>
-              <Button size="sm" onClick={openCreateModal} className="gap-1.5 h-8 text-xs">
-                <Plus className="w-3.5 h-3.5" />
-                Novo Funcionário
-              </Button>
-            </div>
-          )}
+      {/* BLOCO 2: Barra de Filtros */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center shrink-0 w-full">
+        <div className="relative w-full sm:max-w-sm shrink-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Pesquisar nome, número..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 h-10 shadow-sm"
+          />
         </div>
+        <Select value={ativoFilter} onValueChange={setAtivoFilter}>
+          <SelectTrigger className="w-full sm:w-32 h-10 shadow-sm shrink-0">
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="ativo">Ativos</SelectItem>
+            <SelectItem value="inativo">Inativos</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={examFilter} onValueChange={setExamFilter}>
+          <SelectTrigger className="w-full sm:w-44 h-10 shadow-sm shrink-0">
+            <SelectValue placeholder="Exame" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos Exames</SelectItem>
+            <SelectItem value="vencido">Vencidos 🔴</SelectItem>
+            <SelectItem value="a_vencer">A Vencer (30d) 🟠</SelectItem>
+            <SelectItem value="em_dia">Em Dia 🟢</SelectItem>
+            <SelectItem value="sem_data">Sem Registo</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-full sm:w-48 h-10 shadow-sm shrink-0">
+            <SelectValue placeholder="Ordenar por" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="numero_asc">Nº (Crescente)</SelectItem>
+            <SelectItem value="numero_desc">Nº (Decrescente)</SelectItem>
+            <SelectItem value="nome_asc">Nome (A-Z)</SelectItem>
+            <SelectItem value="nome_desc">Nome (Z-A)</SelectItem>
+          </SelectContent>
+        </Select>
+        {isSuperAdmin && selectedIds.length > 0 && (
+          <Button
+            variant="destructive"
+            className="h-10 gap-2 shadow-sm shrink-0 sm:ml-auto w-full sm:w-auto"
+            onClick={() => setBulkDeleteDialogOpen(true)}
+          >
+            <Trash2 className="w-4 h-4" />
+            Eliminar ({selectedIds.length})
+          </Button>
+        )}
+      </div>
 
+      {/* BLOCO 3: Dashboard Card Wrapper */}
+      <div className="flex flex-col flex-1 bg-card rounded-lg border border-border/50 shadow-sm overflow-hidden">
         {/* Table */}
         <div className="flex-1 overflow-auto">
           <DataTable
@@ -675,7 +673,7 @@ export function FuncionariosTab() {
 
         {/* Count footer */}
         {!loading && (
-          <div className="shrink-0 flex items-center justify-between px-4 py-2 text-xs text-muted-foreground border-t border-border">
+          <div className="shrink-0 flex items-center justify-between px-4 py-3 text-xs text-muted-foreground border-t bg-muted/20">
             <span>
               A mostrar <span className="font-semibold text-foreground">{filteredFuncionarios.length}</span> de{' '}
               <span className="font-semibold text-foreground">{funcionarios.length}</span> funcionários
@@ -702,32 +700,32 @@ export function FuncionariosTab() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-6 py-6">
             {/* Row 1: Número + Estado */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Número do Funcionário *</Label>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-sm">Número do Funcionário *</Label>
                 <Input
                   value={formData.numero_funcionario}
                   onChange={(e) =>
                     setFormData({ ...formData, numero_funcionario: e.target.value })
                   }
                   placeholder="Ex: 12345"
-                  className={formErrors.numero_funcionario ? 'border-destructive' : ''}
+                  className={`h-10 ${formErrors.numero_funcionario ? 'border-destructive' : ''}`}
                 />
                 {formErrors.numero_funcionario && (
                   <p className="text-sm text-destructive">{formErrors.numero_funcionario}</p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>Estado</Label>
+              <div className="space-y-3">
+                <Label className="text-sm">Estado</Label>
                 <Select
                   value={formData.estado}
                   onValueChange={(value) =>
                     setFormData({ ...formData, estado: value })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -739,13 +737,13 @@ export function FuncionariosTab() {
             </div>
 
             {/* Row 2: Nome Completo */}
-            <div className="space-y-2">
-              <Label>Nome Completo *</Label>
+            <div className="space-y-3">
+              <Label className="text-sm">Nome Completo *</Label>
               <Input
                 value={formData.nome}
                 onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                 placeholder="Nome do funcionário"
-                className={formErrors.nome ? 'border-destructive' : ''}
+                className={`h-10 ${formErrors.nome ? 'border-destructive' : ''}`}
               />
               {formErrors.nome && (
                 <p className="text-sm text-destructive">{formErrors.nome}</p>
@@ -753,9 +751,9 @@ export function FuncionariosTab() {
             </div>
 
             {/* Row 3: Telefone + Data Nascimento */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Telefone</Label>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-sm">Telefone</Label>
                 <Input
                   value={formData.telefone}
                   onChange={(e) => {
@@ -766,72 +764,79 @@ export function FuncionariosTab() {
                   placeholder="912345678"
                   inputMode="numeric"
                   maxLength={9}
-                  className={formErrors.telefone ? 'border-destructive' : ''}
+                  className={`h-10 ${formErrors.telefone ? 'border-destructive' : ''}`}
                 />
                 {formErrors.telefone && (
                   <p className="text-sm text-destructive">{formErrors.telefone}</p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>Data de Nascimento</Label>
+              <div className="space-y-3">
+                <Label className="text-sm flex items-center gap-2">
+                  Data de Nascimento
+                </Label>
                 <Input
                   type="date"
                   value={formData.data_nascimento}
                   onChange={(e) =>
                     setFormData({ ...formData, data_nascimento: e.target.value })
                   }
+                  className="h-10"
                 />
               </div>
             </div>
 
             {/* Row 4: Categoria + Serviço */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Categoria</Label>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-sm">Categoria</Label>
                 <Input
                   value={formData.categoria}
                   onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
                   placeholder="Ex: Técnico Superior"
+                  className="h-10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Serviço</Label>
+              <div className="space-y-3">
+                <Label className="text-sm">Serviço</Label>
                 <Input
                   value={formData.servico}
                   onChange={(e) => setFormData({ ...formData, servico: e.target.value })}
                   placeholder="Ex: Serviços Médicos"
+                  className="h-10"
                 />
               </div>
             </div>
 
             {/* Row 7: Admissão + Último Exame */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data de Admissão</Label>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-sm">Data de Admissão</Label>
                 <Input
                   type="date"
                   value={formData.data_admissao}
                   onChange={(e) => setFormData({ ...formData, data_admissao: e.target.value })}
+                  className="h-10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Último Exame</Label>
+              <div className="space-y-3">
+                <Label className="text-sm">Último Exame</Label>
                 <Input
                   type="date"
                   value={formData.ultimo_exame}
                   onChange={(e) => setFormData({ ...formData, ultimo_exame: e.target.value })}
+                  className="h-10"
                 />
               </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>
+          <DialogFooter className="gap-2 sm:gap-0 mt-2">
+            <Button variant="outline" className="h-10" onClick={() => setModalOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button className="h-10" onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {editingFuncionario ? 'Guardar' : 'Criar'}
+              {editingFuncionario ? 'Guardar Alterações' : 'Criar Funcionário'}
             </Button>
           </DialogFooter>
         </DialogContent>

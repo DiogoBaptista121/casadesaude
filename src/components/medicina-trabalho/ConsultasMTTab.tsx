@@ -480,17 +480,20 @@ export function ConsultasMTTab() {
       key: 'actions',
       header: '',
       cell: (item) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 justify-end">
           {hasEditAccess && (
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>
-              <Edit2 className="w-4 h-4" />
-            </Button>
-          )}
-          {hasEditAccess && (
-            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive"
-              onClick={(e) => { e.stopPropagation(); openDeleteDialog(item); }}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <>
+              <Button variant="ghost" size="icon" className="h-7 w-7"
+                onClick={(e) => { e.stopPropagation(); openEditModal(item); }}>
+                <Edit2 className="w-3.5 h-3.5 text-muted-foreground" />
+              </Button>
+              {isSuperAdmin && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={(e) => { e.stopPropagation(); openDeleteDialog(item); }}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              )}
+            </>
           )}
         </div>
       ),
@@ -515,92 +518,103 @@ export function ConsultasMTTab() {
   const columns = !canManageBulk ? baseColumns : [checkboxColumn, ...baseColumns];
 
   return (
-    <div className="flex flex-col h-full gap-3">
-      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-        <div className="flex flex-col sm:flex-row gap-2 flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input placeholder="Pesquisar funcionário..." value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-8 text-sm" />
-          </div>
-          <Input type="date" value={dataFilter} onChange={(e) => setDataFilter(e.target.value)} className="w-full sm:w-36 h-8 text-sm" />
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-36 h-8 text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="agendada">Agendada</SelectItem>
-              <SelectItem value="confirmada">Confirmada</SelectItem>
-              <SelectItem value="concluida">Concluída</SelectItem>
-              <SelectItem value="cancelada">Cancelada</SelectItem>
-              <SelectItem value="falta">Falta</SelectItem>
-            </SelectContent>
-          </Select>
-          {isSuperAdmin && selectedIds.length > 0 && (
-            <Button variant="destructive" size="sm" className="gap-1.5 h-8 text-xs shrink-0"
-              onClick={() => setBulkDeleteDialogOpen(true)}>
-              <Trash2 className="w-3.5 h-3.5" />Eliminar ({selectedIds.length})
-            </Button>
-          )}
+    <div className="flex flex-col h-full gap-5">
+      {/* BLOCO 1: PageHeader */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Medicina do Trabalho</h1>
+          <p className="text-sm text-muted-foreground">Gestão de consultas de medicina do trabalho</p>
         </div>
-
         {hasEditAccess && (
-          <div className="flex gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <label className="cursor-pointer">
               <input type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="hidden" />
-              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs" asChild>
-                <span><FileUp className="w-3.5 h-3.5" />Importar</span>
+              <Button variant="outline" className="gap-2 h-10 shadow-sm" asChild>
+                <span><FileUp className="w-4 h-4 text-muted-foreground" />Importar</span>
               </Button>
             </label>
-            <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5 h-8 text-xs">
-              <FileDown className="w-3.5 h-3.5" />Exportar
+            <Button variant="outline" onClick={handleExport} className="gap-2 h-10 shadow-sm">
+              <FileDown className="w-4 h-4 text-muted-foreground" />Exportar
             </Button>
-            <Button size="sm" onClick={openCreateModal} className="gap-1.5 h-8 text-xs">
-              <Plus className="w-3.5 h-3.5" />Nova Consulta MT
+            <Button onClick={openCreateModal} className="gap-2 h-10 shadow-sm">
+              <Plus className="w-4 h-4" />Nova Consulta MT
             </Button>
           </div>
         )}
       </div>
 
-      <DataTable columns={columns} data={filteredConsultas} loading={loading}
-        emptyTitle="Sem consultas MT"
-        emptyDescription="Ainda não existem consultas de medicina do trabalho."
-        onRowClick={hasEditAccess ? openEditModal : undefined} />
-
-      {!loading && (
-        <div className="shrink-0 flex items-center justify-between px-1 py-1.5 text-xs text-muted-foreground border-t border-slate-100">
-          <span>A mostrar <span className="font-semibold text-foreground mx-1">{filteredConsultas.length}</span> de{' '}
-            <span className="font-semibold text-foreground mx-1">{consultas.length}</span> consultas MT</span>
-          {selectedIds.length > 0 && (
-            <span className="text-primary font-medium">{selectedIds.length} selecionada(s)</span>
-          )}
+      {/* BLOCO 2: Barra de Filtros */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center shrink-0 w-full">
+        <div className="relative w-full sm:max-w-sm shrink-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Pesquisar funcionário..." value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 h-10 shadow-sm" />
         </div>
-      )}
+        <Input type="date" value={dataFilter} onChange={(e) => setDataFilter(e.target.value)} className="w-full sm:w-40 h-10 shadow-sm" />
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-40 h-10 shadow-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="agendada">Agendada</SelectItem>
+            <SelectItem value="confirmada">Confirmada</SelectItem>
+            <SelectItem value="concluida">Concluída</SelectItem>
+            <SelectItem value="cancelada">Cancelada</SelectItem>
+            <SelectItem value="falta">Falta</SelectItem>
+          </SelectContent>
+        </Select>
+        {isSuperAdmin && selectedIds.length > 0 && (
+          <Button variant="destructive" className="gap-2 h-10 shadow-sm shrink-0 sm:ml-auto w-full sm:w-auto"
+            onClick={() => setBulkDeleteDialogOpen(true)}>
+            <Trash2 className="w-4 h-4" />Eliminar ({selectedIds.length})
+          </Button>
+        )}
+      </div>
+
+      {/* BLOCO 3: Card da Tabela */}
+      <div className="flex flex-col flex-1 bg-card rounded-lg border border-border/50 shadow-sm overflow-hidden">
+        <div className="flex-1 overflow-auto">
+          <DataTable columns={columns} data={filteredConsultas} loading={loading}
+            emptyTitle="Sem consultas MT"
+            emptyDescription="Ainda não existem consultas de medicina do trabalho."
+            onRowClick={hasEditAccess ? openEditModal : undefined} />
+        </div>
+
+        {!loading && (
+          <div className="shrink-0 flex items-center justify-between px-5 py-3 text-xs text-muted-foreground border-t border-border/50">
+            <span>A mostrar <span className="font-semibold text-foreground mx-1">{filteredConsultas.length}</span> de{' '}
+              <span className="font-semibold text-foreground mx-1">{consultas.length}</span> consultas MT</span>
+            {selectedIds.length > 0 && (
+              <span className="text-primary font-medium">{selectedIds.length} selecionada(s)</span>
+            )}
+          </div>
+        )}
+      </div>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Stethoscope className="w-5 h-5 text-primary" />
               {editingConsulta ? 'Editar Consulta MT' : 'Nova Consulta MT'}
             </DialogTitle>
-            <DialogDescription>
+             <DialogDescription>
               {editingConsulta ? 'Atualize os dados da consulta' : 'Agende uma nova consulta de medicina do trabalho'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Funcionário *</Label>
+          <div className="grid gap-6 py-6">
+            <div className="space-y-3">
+              <Label className="text-sm">Funcionário *</Label>
               <Popover open={funcionarioOpen} onOpenChange={setFuncionarioOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" aria-expanded={funcionarioOpen} className="w-full justify-between font-normal">
+                  <Button variant="outline" role="combobox" aria-expanded={funcionarioOpen} className="w-full justify-between font-normal h-10">
                     {selectedFuncionario ? `${selectedFuncionario.nome} (${selectedFuncionario.numero_funcionario})` : 'Selecione um funcionário...'}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0" align="start">
+                <PopoverContent className="w-[480px] p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Pesquisar funcionário..." />
+                    <CommandInput placeholder="Pesquisar funcionário..." className="h-10" />
                     <CommandList>
                       <CommandEmpty>Nenhum funcionário encontrado.</CommandEmpty>
                       <CommandGroup>
@@ -618,10 +632,10 @@ export function ConsultasMTTab() {
               </Popover>
             </div>
 
-            <div className="space-y-2">
-              <Label>Tipo de Exame</Label>
+            <div className="space-y-3">
+              <Label className="text-sm">Tipo de Exame</Label>
               <Select value={formData.tipo_exame} onValueChange={(value) => setFormData({ ...formData, tipo_exame: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admissão">Admissão</SelectItem>
                   <SelectItem value="periódico">Periódica</SelectItem>
@@ -631,21 +645,21 @@ export function ConsultasMTTab() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Data *</Label>
-                <Input type="date" value={formData.data} onChange={(e) => setFormData({ ...formData, data: e.target.value })} />
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-sm">Data *</Label>
+                <Input type="date" value={formData.data} onChange={(e) => setFormData({ ...formData, data: e.target.value })} className="h-10" />
               </div>
-              <div className="space-y-2">
-                <Label>Hora *</Label>
-                <Input type="time" value={formData.hora} onChange={(e) => setFormData({ ...formData, hora: e.target.value })} />
+              <div className="space-y-3">
+                <Label className="text-sm">Hora *</Label>
+                <Input type="time" value={formData.hora} onChange={(e) => setFormData({ ...formData, hora: e.target.value })} className="h-10" />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Status</Label>
+            <div className="space-y-3">
+              <Label className="text-sm">Status</Label>
               <Select value={formData.status} onValueChange={(value: ConsultaStatus) => setFormData({ ...formData, status: value })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="agendada">Agendada</SelectItem>
                   <SelectItem value="confirmada">Confirmada</SelectItem>
@@ -656,10 +670,10 @@ export function ConsultasMTTab() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Resultado</Label>
+            <div className="space-y-3">
+              <Label className="text-sm">Resultado</Label>
               <Select value={formData.resultado} onValueChange={(value) => setFormData({ ...formData, resultado: value })}>
-                <SelectTrigger><SelectValue placeholder="Selecione o resultado..." /></SelectTrigger>
+                <SelectTrigger className="h-10"><SelectValue placeholder="Selecione o resultado..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="apto">Apto</SelectItem>
                   <SelectItem value="apto_com_recomendacoes">Apto com Recomendações</SelectItem>
@@ -669,18 +683,18 @@ export function ConsultasMTTab() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Notas</Label>
+            <div className="space-y-3">
+              <Label className="text-sm">Notas</Label>
               <Textarea value={formData.notas} onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-                placeholder="Observações da consulta..." rows={3} />
+                placeholder="Observações da consulta..." rows={3} className="resize-none" />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving}>
+          <DialogFooter className="gap-2 sm:gap-0 mt-2">
+            <Button variant="outline" className="h-10" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            <Button className="h-10" onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {editingConsulta ? 'Guardar' : 'Criar'}
+              {editingConsulta ? 'Guardar Alterações' : 'Criar Consulta'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -16,13 +16,8 @@ export default function MedicinaTrabalhoPage() {
 
 
   return (
-    <div className="page-enter flex flex-col h-full gap-3 max-w-7xl mx-auto w-full p-4">
-      <PageHeader
-        title="Medicina do Trabalho"
-        description="Gestão de funcionários e consultas de medicina do trabalho"
-      />
-
-      <div className="flex-1 overflow-hidden flex flex-col mt-2">
+    <div className="page-enter flex flex-col h-full gap-3">
+      <div className="flex-1 overflow-hidden flex flex-col">
         {activeTab === 'consultas' ? <ConsultasMTTab /> : <FuncionariosTab />}
       </div>
     </div>

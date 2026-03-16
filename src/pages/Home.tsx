@@ -181,14 +181,6 @@ export default function HomePage() {
 
   return (
     <div className="page-enter space-y-6 w-full relative">
-
-      {/* ── Badge de Versão (Canto Superior Direito) ────────────────── */}
-      <div className="fixed top-[18px] right-[24px] z-[100] hidden sm:block">
-        <span className="text-[10px] font-mono text-muted-foreground/40 border border-border/50 rounded-md px-2 py-0.5 bg-background/80 backdrop-blur-sm">
-          Versão: 1.0.0.2026
-        </span>
-      </div>
-
       {/* ── Greeting header ─────────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-4 pt-1">
         <div>
