@@ -19,6 +19,14 @@ export function AppLayout({ children }: AppLayoutProps) {
             {children}
           </div>
         </main>
+
+        {/* ── SELO DE VERSÃO GLOBAL ── */}
+        <div className="fixed top-4 right-6 z-[9999] pointer-events-none hidden sm:block">
+          <span className="text-[10px] font-mono text-muted-foreground/50 bg-background/50 backdrop-blur-sm border border-border/50 rounded-md px-2 py-1 shadow-sm">
+            Versão: 1.1.10.2026
+          </span>
+        </div>
+
       </div>
       <Toaster position="top-right" richColors closeButton />
     </SidebarProvider>

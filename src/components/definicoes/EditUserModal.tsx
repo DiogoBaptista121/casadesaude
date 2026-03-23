@@ -26,21 +26,21 @@ interface EditUserModalProps {
 
 const roleLabels: Record<AppRole, string> = {
     admin: 'Administrador',
-    manager: 'Gestor',
-    staff: 'Colaborador',
-    viewer: 'Visualizador',
+    gestor: 'Gestor',
+    colaborador: 'Colaborador',
+    visualizador: 'Visualizador',
 };
 
 export function EditUserModal({ open, onOpenChange, user, onSuccess, currentUserId }: EditUserModalProps) {
     const [nome, setNome] = useState('');
-    const [role, setRole] = useState<AppRole>('viewer');
+    const [role, setRole] = useState<AppRole>('visualizador');
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (user) {
             setNome(user.nome || '');
-            setRole(user.role || 'viewer');
+            setRole(user.role || 'visualizador');
             setErrors({});
         }
     }, [user]);
@@ -64,7 +64,6 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess, currentUser
         setLoading(true);
 
         try {
-            // Update profile name via SECURITY DEFINER function
             if (nome.trim() !== (user.nome || '')) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const { error: profileError } = await (supabase.rpc as any)('update_user_profile', {
@@ -74,7 +73,6 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess, currentUser
                 if (profileError) throw new Error(`Erro ao atualizar nome: ${profileError.message}`);
             }
 
-            // Update role via SECURITY DEFINER function (not for self)
             if (!isSelf && role !== user.role) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const { error: roleError } = await (supabase.rpc as any)('update_user_role', {
@@ -114,13 +112,11 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess, currentUser
                 </DialogHeader>
 
                 <div className="space-y-4 py-2">
-                    {/* Email (read-only) */}
                     <div className="space-y-1.5">
                         <Label className="text-muted-foreground">Email</Label>
                         <p className="text-sm font-medium px-3 py-2 bg-muted rounded-md">{user?.email}</p>
                     </div>
 
-                    {/* Nome */}
                     <div className="space-y-1.5">
                         <Label htmlFor="edit-nome">Nome *</Label>
                         <Input
@@ -133,7 +129,6 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess, currentUser
                         {errors.nome && <p className="text-xs text-destructive">{errors.nome}</p>}
                     </div>
 
-                    {/* Role */}
                     <div className="space-y-1.5">
                         <Label htmlFor="edit-role">Permissão</Label>
                         <Select
@@ -145,9 +140,9 @@ export function EditUserModal({ open, onOpenChange, user, onSuccess, currentUser
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="viewer">Visualizador — só leitura</SelectItem>
-                                <SelectItem value="staff">Colaborador — ver e editar consultas</SelectItem>
-                                <SelectItem value="manager">Gestor — gerir dados, sem admin</SelectItem>
+                                <SelectItem value="visualizador">Visualizador — só leitura</SelectItem>
+                                <SelectItem value="colaborador">Colaborador — ver e editar consultas</SelectItem>
+                                <SelectItem value="gestor">Gestor — gerir dados, sem admin</SelectItem>
                                 <SelectItem value="admin">Administrador — acesso total</SelectItem>
                             </SelectContent>
                         </Select>
