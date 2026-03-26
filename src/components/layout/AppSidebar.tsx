@@ -16,6 +16,9 @@ import {
   Users,
   ClipboardList,
   Truck,
+  Brain,
+  Building2,
+  HeartHandshake,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { NavLink as RouterNavLink, Link, useLocation } from 'react-router-dom';
@@ -40,12 +43,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 const menuItems = [
-  { title: 'Início', url: '/', icon: Home, roles: ['admin', 'gestor', 'colaborador', 'visualizador'] },
-  { title: 'Cartão de Saúde', url: '/cartao-saude', icon: CreditCard, roles: ['admin', 'gestor', 'colaborador'] },
-  { title: 'Consultas', url: '/consultas', icon: Calendar, roles: ['admin', 'gestor', 'colaborador'] },
+  { title: 'Início', url: '/', icon: Home, roles: ['admin', 'gestor', 'colaborador_casa_saude', 'colaborador_unidade_movel', 'psicologa', 'visualizador'] },
+  { title: 'Cartão de Saúde', url: '/cartao-saude', icon: CreditCard, roles: ['admin', 'gestor', 'colaborador_casa_saude', 'colaborador_unidade_movel'] },
   { title: 'Dashboard', url: '/dashboard', icon: BarChart3, roles: ['admin', 'gestor'] },
   { title: 'Importar/Exportar', url: '/importar-exportar', icon: FileSpreadsheet, roles: ['admin', 'gestor'] },
-  { title: 'Definições', url: '/definicoes', icon: Settings, roles: ['admin', 'gestor', 'colaborador', 'visualizador'] },
+  { title: 'Definições', url: '/definicoes', icon: Settings },
 ];
 
 const calendarioSubItems = [
@@ -54,18 +56,32 @@ const calendarioSubItems = [
   { title: 'Agenda Unidade Móvel', url: '/agenda-unidade-movel', icon: Truck },
 ];
 
+const consultasSubItems = [
+  { title: 'Casa de Saúde', url: '/consultas/casa-saude', icon: Building2, roles: ['admin', 'gestor', 'colaborador_casa_saude'] },
+  { title: 'Neurologia', url: '/consultas/neurologia', icon: Brain, roles: ['admin', 'gestor'] },
+  { title: 'Psicologia', url: '/consultas/psicologia', icon: HeartHandshake, roles: ['admin', 'gestor', 'psicologa'] },
+  { title: 'Unidade Móvel', url: '/consultas/unidade-movel', icon: Truck, roles: ['admin', 'gestor', 'colaborador_unidade_movel'] },
+];
+
 const medicinaSubItems = [
   { title: 'Funcionários', url: '/medicina-trabalho?tab=funcionarios', icon: Users },
   { title: 'Consultas MT', url: '/medicina-trabalho?tab=consultas', icon: ClipboardList },
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const location = useLocation();
   const { profile, role, signOut } = useAuth();
   const isCollapsed = state === 'collapsed';
 
   const [pendingCartoes, setPendingCartoes] = useState(0);
+
+  // Fecha a sidebar no mobile sempre que muda de página
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [location.pathname, location.search, isMobile, setOpenMobile]);
 
   useEffect(() => {
     if (role === 'admin' || role === 'gestor') {
@@ -93,10 +109,21 @@ export function AppSidebar() {
     location.pathname === '/agenda-unidade-movel';
   const [calendarioOpen, setCalendarioOpen] = useState(isCalendarioActive);
 
+  const isConsultasActive = location.pathname.startsWith('/consultas');
+  const [consultasOpen, setConsultasOpen] = useState(isConsultasActive);
+
+  useEffect(() => {
+    if (isConsultasActive) setConsultasOpen(true);
+  }, [isConsultasActive]);
+
   const isMedicinaActive = location.pathname === '/medicina-trabalho';
   const [medicinaOpen, setMedicinaOpen] = useState(isMedicinaActive);
 
   const visibleMenuItems = menuItems.filter(
+    (item) => !item.roles || item.roles.includes(role || 'visualizador')
+  );
+
+  const visibleConsultasSubItems = consultasSubItems.filter(
     (item) => !item.roles || item.roles.includes(role || 'visualizador')
   );
 
@@ -109,7 +136,9 @@ export function AppSidebar() {
     switch (r) {
       case 'admin': return 'Administrador';
       case 'gestor': return 'Gestor';
-      case 'colaborador': return 'Colaborador';
+      case 'colaborador_casa_saude': return 'Colaborador Casa de Saúde';
+      case 'colaborador_unidade_movel': return 'Colaborador Unidade Móvel';
+      case 'psicologa': return 'Psicóloga';
       case 'visualizador': return 'Visualizador';
       default: return 'Utilizador';
     }
@@ -227,7 +256,79 @@ export function AppSidebar() {
                 )}
               </SidebarMenuItem>
 
-              {/* 3. Medicina do Trabalho — só admin */}
+              {/* 3. Consultas group — only shown if at least one subitem is visible */}
+              {visibleConsultasSubItems.length > 0 && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => !isCollapsed && setConsultasOpen((o) => !o)}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 w-full cursor-pointer',
+                    'text-white/80 hover:text-white hover:bg-white/10',
+                    isConsultasActive && 'text-white font-medium'
+                  )}
+                >
+                  <Calendar className={cn('w-5 h-5 flex-shrink-0', isConsultasActive ? 'text-white' : 'text-white/70')} />
+                  {!isCollapsed && (
+                    <>
+                      <span className="truncate flex-1">Consultas</span>
+                      <ChevronDown className={cn('w-4 h-4 text-white/60 transition-transform duration-200', consultasOpen && 'rotate-180')} />
+                    </>
+                  )}
+                </SidebarMenuButton>
+
+                {!isCollapsed && consultasOpen && (
+                  <SidebarMenuSub className="ml-2 mt-1 space-y-0.5">
+                    {visibleConsultasSubItems.map((sub) => {
+                      const isSubActive = location.pathname === sub.url;
+                      return (
+                        <SidebarMenuSubItem key={sub.url}>
+                          <SidebarMenuSubButton asChild>
+                            <RouterNavLink
+                              to={sub.url}
+                              className={cn(
+                                'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-200',
+                                'text-white/70 hover:text-white hover:bg-white/10',
+                                isSubActive && 'bg-white/15 text-white font-medium'
+                              )}
+                            >
+                              <sub.icon className={cn('w-4 h-4 flex-shrink-0', isSubActive ? 'text-white' : 'text-white/60')} />
+                              <span className="truncate">{sub.title}</span>
+                            </RouterNavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                )}
+
+                {isCollapsed && (
+                  <SidebarMenuSub className="mt-1 space-y-0.5">
+                    {visibleConsultasSubItems.map((sub) => {
+                      const isSubActive = location.pathname === sub.url;
+                      return (
+                        <SidebarMenuSubItem key={sub.url}>
+                          <SidebarMenuSubButton asChild>
+                            <RouterNavLink
+                              to={sub.url}
+                              title={sub.title}
+                              className={cn(
+                                'flex items-center justify-center px-2 py-2 rounded-lg transition-all duration-200',
+                                'text-white/70 hover:text-white hover:bg-white/10',
+                                isSubActive && 'bg-white/15 text-white'
+                              )}
+                            >
+                              <sub.icon className="w-4 h-4 flex-shrink-0" />
+                            </RouterNavLink>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                )}
+              </SidebarMenuItem>
+              )}
+
+              {/* 4. Medicina do Trabalho — só admin */}
               {role === 'admin' && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -309,7 +410,7 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
-              {/* 4. Restantes itens (exceto Início e Definições) */}
+              {/* 5. Restantes itens (exceto Início e Definições) */}
               {visibleMenuItems.filter(i => i.title !== 'Início' && i.title !== 'Definições').map((item) => {
                 const isActive = location.pathname === item.url || (item.url !== '/' && location.pathname.startsWith(item.url));
                 return (
@@ -339,7 +440,7 @@ export function AppSidebar() {
                 );
               })}
 
-              {/* 5. Definições */}
+              {/* 6. Definições */}
               <div className="pt-2 mt-2 border-t border-white/10" />
               {visibleMenuItems.filter(i => i.title === 'Definições').map((item) => {
                 const isActive = location.pathname === item.url || (item.url !== '/' && location.pathname.startsWith(item.url));

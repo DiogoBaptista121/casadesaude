@@ -34,7 +34,7 @@ export function usePermissions(): Permissions {
 
     const isAdmin = role === 'admin';
     const isGestor = role === 'gestor';
-    const isColaborador = role === 'colaborador';
+    const isColaborador = role === 'colaborador_casa_saude' || role === 'colaborador_unidade_movel' || role === 'psicologa';
     const isVisualizador = role === 'visualizador';
 
     return {

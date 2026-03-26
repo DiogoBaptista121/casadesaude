@@ -1,7 +1,8 @@
-import { CalendarEvent, CalendarEventData } from './CalendarEvent';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay } from 'date-fns';
-import { pt } from 'date-fns/locale';
+import { CalendarEventData } from './CalendarEvent';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { pt } from 'date-fns/locale';
 
 interface MonthViewProps {
   date: Date;
@@ -29,78 +30,116 @@ export function MonthView({ date, events, onEventClick }: MonthViewProps) {
     weeks.push(days.slice(i, i + 7));
   }
 
-  const getEventsForDay = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
-    return events
-      .filter(e => e.date === dateStr)
-      .sort((a, b) => a.time.localeCompare(b.time))
-      .slice(0, 3);
-  };
-
-  const getEventCountForDay = (day: Date) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
-    return events.filter(e => e.date === dateStr).length;
-  };
-
   const weekDays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
   return (
-    <div className="flex flex-col h-full rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm bg-card overflow-hidden">
-      {/* Day-of-week header */}
-      <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-700/50 bg-slate-50/50 dark:bg-transparent shrink-0">
-        {weekDays.map((d) => (
+    <div className="flex flex-col h-full rounded-xl border border-border/50 shadow-sm bg-card overflow-hidden">
+      {/* Day-of-week header — extremely compact */}
+      <div className="grid grid-cols-7 border-b border-border/50 bg-transparent shrink-0">
+        {weekDays.map((d, idx) => (
           <div
             key={d}
-            className="pb-3 pt-3 text-center text-[11px] uppercase tracking-widest font-semibold text-slate-400 dark:text-slate-500"
+            className={cn(
+              'py-1.5 text-center text-[10px] uppercase tracking-wider font-medium',
+              idx >= 5 ? 'text-muted-foreground/50' : 'text-muted-foreground'
+            )}
           >
             {d}
           </div>
         ))}
       </div>
 
-      {/* Weeks */}
-      <div className="divide-y divide-slate-200 dark:divide-slate-700/50 flex flex-col flex-1">
-        {weeks.map((week, weekIndex) => (
-          <div key={weekIndex} className="grid grid-cols-7 divide-x divide-slate-200 dark:divide-slate-700/50 flex-1">
+      {/* Scrollable Weeks grid container */}
+      <div className="flex-1 overflow-y-auto p-2 custom-scrollbar min-h-0">
+        <div 
+          className="grid divide-y divide-border/50"
+          style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(120px, 1fr))` }}
+        >
+          {weeks.map((week, weekIndex) => (
+            <div key={weekIndex} className="grid grid-cols-7 divide-x divide-border/50">
             {week.map((dayItem) => {
-              const dayEvents = getEventsForDay(dayItem);
-              const totalCount = getEventCountForDay(dayItem);
+              const dateStr = format(dayItem, 'yyyy-MM-dd');
+              const allDayEvents = events.filter(e => e.date === dateStr).sort((a, b) => a.time.localeCompare(b.time));
+              const dayEvents = allDayEvents.slice(0, 3);
+              const totalCount = allDayEvents.length;
               const isCurrentMonth = isSameMonth(dayItem, date);
               const isToday = isSameDay(dayItem, today);
+              const isWeekendDay = isWeekend(dayItem);
 
               return (
                 <div
                   key={dayItem.toISOString()}
                   className={cn(
-                    "flex flex-col h-full overflow-hidden p-1.5 transition-colors",
-                    isToday && "bg-slate-50/30 dark:bg-slate-800/20"
+                    'flex flex-col min-w-0 min-h-[120px] overflow-hidden p-1 transition-colors group',
+                    isWeekendDay && 'bg-muted/10',
+                    isToday && 'bg-primary/5'
                   )}
                 >
-                  <div className="flex justify-end pb-1">
+                  <div className="flex justify-center mb-1">
                     <div className={cn(
-                      "flex items-center justify-center",
+                      'flex items-center justify-center text-[11px] font-medium w-6 h-6 rounded-full',
                       isToday
-                        ? "w-7 h-7 rounded-full bg-teal-600 text-white font-bold shadow-sm"
+                        ? 'bg-primary text-primary-foreground shadow-sm'
                         : isCurrentMonth
-                          ? "text-xs font-semibold text-slate-500 dark:text-slate-400"
-                          : "text-xs font-semibold text-slate-300 dark:text-slate-600"
+                          ? isWeekendDay
+                            ? 'text-muted-foreground/70'
+                            : 'text-foreground hover:bg-muted/50 cursor-pointer'
+                          : 'text-muted-foreground/30'
                     )}>
                       {format(dayItem, 'd')}
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                  
+                  {/* Events list container */}
+                  <div className="flex-1 overflow-y-auto space-y-[2px] pr-0.5 custom-scrollbar">
                     {dayEvents.map((event) => (
-                      <CalendarEvent
+                      <button
                         key={event.id}
-                        event={event}
-                        onClick={onEventClick}
-                        compact
-                      />
+                        onClick={() => onEventClick(event)}
+                        className="w-full text-left flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm transition-opacity hover:opacity-80 text-xs"
+                        title={event.time + ' - ' + event.title}
+                        style={{
+                          backgroundColor: `${event.color || '#94a3b8'}26`,
+                          color: event.color || '#64748b'
+                        }}
+                      >
+                        <span className="font-semibold opacity-90 shrink-0">{event.time}</span>
+                        <span className="truncate font-medium">{event.title}</span>
+                      </button>
                     ))}
+                    
                     {totalCount > 3 && (
-                      <p className="text-[10px] text-muted-foreground text-center font-medium">
-                        +{totalCount - 3} mais
-                      </p>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            className="text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded px-1 w-full text-left transition-colors cursor-pointer mt-0.5"
+                          >
+                            +{totalCount - 3} mais
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-2 z-50 shadow-xl" align="start">
+                          <h4 className="text-sm font-medium mb-2 px-1 pb-1 border-b capitalize">
+                            {format(dayItem, "d 'de' MMMM", { locale: pt })}
+                          </h4>
+                          <div className="max-h-[300px] overflow-y-auto space-y-1 custom-scrollbar">
+                            {allDayEvents.map((event) => (
+                              <button
+                                key={event.id}
+                                onClick={() => onEventClick(event)}
+                                className="w-full text-left flex items-center gap-1.5 px-1.5 py-1 rounded-sm transition-opacity hover:opacity-80 text-xs"
+                                title={event.time + ' - ' + event.title}
+                                style={{
+                                  backgroundColor: `${event.color || '#94a3b8'}26`,
+                                  color: event.color || '#64748b'
+                                }}
+                              >
+                                <span className="font-semibold opacity-90 shrink-0">{event.time}</span>
+                                <span className="truncate font-medium">{event.title}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     )}
                   </div>
                 </div>
@@ -108,6 +147,7 @@ export function MonthView({ date, events, onEventClick }: MonthViewProps) {
             })}
           </div>
         ))}
+        </div>
       </div>
     </div>
   );

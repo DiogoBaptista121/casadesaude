@@ -15,8 +15,13 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Search, Edit2, Loader2, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Loader2, Trash2, AlertTriangle, CheckCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import type { CartaoSaude, EstadoEntrega } from '@/types/database';
 
 const estadoEntregaLabelsMap: Record<string, string> = {
@@ -387,7 +392,29 @@ export default function CartaoSaudePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Data de Nascimento</Label>
-                <Input type="date" disabled={isDataLocked} value={formData.data_nascimento || ''} onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })} />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.data_nascimento && "text-muted-foreground"
+                      )}
+                      disabled={isDataLocked}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.data_nascimento ? format(new Date(formData.data_nascimento), "PPP", { locale: pt }) : <span>Selecione uma data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.data_nascimento ? new Date(formData.data_nascimento) : undefined}
+                      onSelect={(date) => setFormData({ ...formData, data_nascimento: date ? date.toISOString() : '' })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>Telefone</Label>
@@ -413,8 +440,29 @@ export default function CartaoSaudePage() {
               </div>
               <div className="space-y-2">
                 <Label>Validade</Label>
-                <Input type="date" value={formData.validade_documento || ''} disabled={formData.tipo_documento === 'BI' || isDataLocked}
-                  onChange={(e) => setFormData({ ...formData, validade_documento: e.target.value })} />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.validade_documento && "text-muted-foreground"
+                      )}
+                      disabled={formData.tipo_documento === 'BI' || isDataLocked}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.validade_documento ? format(new Date(formData.validade_documento), "PPP", { locale: pt }) : <span>Selecione uma data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.validade_documento ? new Date(formData.validade_documento) : undefined}
+                      onSelect={(date) => setFormData({ ...formData, validade_documento: date ? date.toISOString() : '' })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
                 {formData.tipo_documento === 'BI' && <p className="text-red-600 text-[10px] font-bold mt-1">B.I. Vitalício: Validade não necessária.</p>}
               </div>
             </div>

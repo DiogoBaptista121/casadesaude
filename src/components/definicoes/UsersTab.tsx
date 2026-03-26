@@ -26,14 +26,18 @@ interface UserWithRole {
 const roleLabels: Record<AppRole, string> = {
   admin: 'Administrador',
   gestor: 'Gestor',
-  colaborador: 'Colaborador',
+  colaborador_casa_saude: 'Colaborador Casa de Saúde',
+  colaborador_unidade_movel: 'Colaborador Unidade Móvel',
+  psicologa: 'Psicóloga',
   visualizador: 'Visualizador',
 };
 
 const roleBadgeColors: Record<AppRole, string> = {
   admin: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
   gestor: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  colaborador: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  colaborador_casa_saude: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+  colaborador_unidade_movel: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
+  psicologa: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   visualizador: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
 };
 

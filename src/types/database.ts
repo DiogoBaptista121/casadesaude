@@ -1,7 +1,8 @@
 // Casa de Saúde - Database Types
 
-export type AppRole = 'admin' | 'gestor' | 'colaborador' | 'visualizador';
+export type AppRole = 'admin' | 'gestor' | 'colaborador_casa_saude' | 'colaborador_unidade_movel' | 'psicologa' | 'visualizador';
 export type ConsultaStatus = 'agendada' | 'confirmada' | 'concluida' | 'cancelada' | 'falta' | 'remarcada';
+// Mantido por compatibilidade — usar ConsultaTipo para nova lógica
 export type ConsultaOrigem = 'casa_saude' | 'unidade_movel';
 export type EstadoRegisto = 'ativo' | 'inativo';
 export type DocumentoTipo = 'CC' | 'BI';
@@ -252,3 +253,35 @@ export const estadoEntregaColors: Record<EstadoEntrega, string> = {
   ERRO_DADOS: 'badge-falta',
   EXPIRADO: 'badge-falta',
 };
+
+// Substitui o que adicionaste no final do ficheiro por isto:
+
+export type ConsultaTipo =
+  | 'medicina'
+  | 'neurologia'
+  | 'psicologia'
+  | 'enfermagem'
+  | 'unidade_movel';
+
+export interface Psicologa {
+  id: string;
+  nome: string;
+  email: string | null;
+  telefone: string | null;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Atendimento {
+  id: string;
+  paciente_nif: string;
+  servico_id: string;
+  tipo: 'enfermagem' | 'unidade_movel';
+  local: string;
+  data: string;
+  notas: string | null;
+  created_by: string | null;
+  created_at: string;
+  servicos?: Pick<Servico, 'nome' | 'cor'> | null;
+}

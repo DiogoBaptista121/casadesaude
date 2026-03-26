@@ -6,22 +6,23 @@ import { UsersTab } from '@/components/definicoes/UsersTab';
 import { SecurityTab } from '@/components/definicoes/SecurityTab';
 import { NotificationsTab } from '@/components/definicoes/NotificationsTab';
 import { AppearanceTab } from '@/components/definicoes/AppearanceTab';
+import { PsicologasTab } from '@/components/definicoes/PsicologasTab';
 import { usePermissions } from '@/hooks/usePermissions';
 
 export default function DefinicoesPage() {
-  const { isAdmin, isViewer, canEditSettings } = usePermissions();
+  const { isAdmin } = usePermissions();
 
-  // Determine default tab based on role
-  const defaultTab = isAdmin ? 'geral' : isViewer ? 'seguranca' : 'geral';
+  // Determine default tab based on role requirements
+  const defaultTab = isAdmin ? 'geral' : 'seguranca';
 
   return (
     <div className="p-6 space-y-6 h-[calc(100vh-4rem)] overflow-y-auto pb-20">
       <PageHeader title="Definições" description="Configurações do sistema e da sua conta" />
 
       <Tabs defaultValue={defaultTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 lg:w-auto lg:inline-flex">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 lg:w-auto lg:inline-flex">
           {/* Geral — admin and manager */}
-          {canEditSettings && (
+          {isAdmin && (
             <TabsTrigger value="geral" className="gap-2">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Geral</span>
@@ -42,22 +43,27 @@ export default function DefinicoesPage() {
             <span className="hidden sm:inline">Segurança</span>
           </TabsTrigger>
 
-          {/* Notificações — admin and manager */}
-          {canEditSettings && (
-            <TabsTrigger value="notificacoes" className="gap-2">
-              <Bell className="h-4 w-4" />
-              <span className="hidden sm:inline">Notificações</span>
-            </TabsTrigger>
-          )}
+          {/* Notificações — everyone (requested by user) */}
+          <TabsTrigger value="notificacoes" className="gap-2">
+            <Bell className="h-4 w-4" />
+            <span className="hidden sm:inline">Notificações</span>
+          </TabsTrigger>
 
           {/* Aparência — everyone */}
           <TabsTrigger value="aparencia" className="gap-2">
             <Palette className="h-4 w-4" />
             <span className="hidden sm:inline">Aparência</span>
           </TabsTrigger>
+          {/* Psicólogas — admin only */}
+          {isAdmin && (
+            <TabsTrigger value="psicologas" className="gap-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Psicólogas</span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
-        {canEditSettings && (
+        {isAdmin && (
           <TabsContent value="geral" className="mt-6">
             <GeneralSettingsTab />
           </TabsContent>
@@ -73,9 +79,13 @@ export default function DefinicoesPage() {
           <SecurityTab />
         </TabsContent>
 
-        {canEditSettings && (
-          <TabsContent value="notificacoes" className="mt-6">
-            <NotificationsTab />
+        <TabsContent value="notificacoes" className="mt-6">
+          <NotificationsTab />
+        </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="psicologas" className="mt-6">
+            <PsicologasTab />
           </TabsContent>
         )}
 

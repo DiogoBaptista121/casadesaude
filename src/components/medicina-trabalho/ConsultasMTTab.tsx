@@ -37,6 +37,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
 import {
   Plus,
   Search,
@@ -648,7 +650,28 @@ export function ConsultasMTTab() {
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-3">
                 <Label className="text-sm">Data *</Label>
-                <Input type="date" value={formData.data} onChange={(e) => setFormData({ ...formData, data: e.target.value })} className="h-10" />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-10 px-3",
+                        !formData.data && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.data ? format(new Date(formData.data), "PPP", { locale: pt }) : <span>Selecione uma data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.data ? new Date(formData.data) : undefined}
+                      onSelect={(date) => setFormData({ ...formData, data: date ? date.toISOString() : '' })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-3">
                 <Label className="text-sm">Hora *</Label>
