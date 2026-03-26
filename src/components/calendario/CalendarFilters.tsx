@@ -39,70 +39,55 @@ export function CalendarFilters({
   canEdit,
 }: CalendarFiltersProps) {
   return (
-    <div className="bg-transparent mb-1 px-1 py-1 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-      <div className="flex flex-wrap gap-2">
-        <Select value={servicoFilter} onValueChange={setServicoFilter}>
-          <SelectTrigger className="h-9 w-36 text-xs border-slate-200 bg-transparent rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
-            <SelectValue placeholder="Serviço" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os Serviços</SelectItem>
-            {servicos.map((s) => (
-              <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="flex items-center gap-3">
+      <Select value={servicoFilter} onValueChange={setServicoFilter}>
+        <SelectTrigger className="h-8 w-36 text-[13px] border-dashed border-border/60 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <SelectValue placeholder="Serviço" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="todos">Todos os Serviços</SelectItem>
+          {servicos.map((s) => (
+            <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-        <Select value={tipoFilter} onValueChange={setTipoFilter}>
-          <SelectTrigger className="h-9 w-40 text-xs border-slate-200 bg-transparent rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os Tipos</SelectItem>
-            <SelectItem value="consulta">Consultas</SelectItem>
-            <SelectItem value="medicina_trabalho">Medicina do Trabalho</SelectItem>
-          </SelectContent>
-        </Select>
+      <Select value={tipoFilter} onValueChange={setTipoFilter}>
+        <SelectTrigger className="h-8 w-36 text-[13px] border-dashed border-border/60 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <SelectValue placeholder="Tipo" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="todos">Todos os Tipos</SelectItem>
+          <SelectItem value="consulta">Consultas</SelectItem>
+          <SelectItem value="medicina_trabalho">Medicina do Trabalho</SelectItem>
+        </SelectContent>
+      </Select>
 
-        <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
-          <SelectTrigger className="h-9 w-36 text-xs border-slate-200 bg-transparent rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
-            <SelectValue placeholder="Unidade" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todas Unidades</SelectItem>
-            <SelectItem value="casa_saude">Casa de Saúde</SelectItem>
-            <SelectItem value="unidade_movel">Unidade Móvel</SelectItem>
-          </SelectContent>
-        </Select>
+      <Select value={unidadeFilter} onValueChange={setUnidadeFilter}>
+        <SelectTrigger className="h-8 w-36 text-[13px] border-dashed border-border/60 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <SelectValue placeholder="Unidade" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="todos">Todas Unidades</SelectItem>
+          <SelectItem value="casa_saude">Casa de Saúde</SelectItem>
+          <SelectItem value="unidade_movel">Unidade Móvel</SelectItem>
+        </SelectContent>
+      </Select>
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-9 w-32 text-xs border-slate-200 bg-transparent rounded-lg shadow-sm hover:bg-slate-50 transition-colors">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos Status</SelectItem>
-            <SelectItem value="agendada">Agendada</SelectItem>
-            <SelectItem value="confirmada">Confirmada</SelectItem>
-            <SelectItem value="concluida">Concluída</SelectItem>
-            <SelectItem value="cancelada">Cancelada</SelectItem>
-            <SelectItem value="falta">Falta</SelectItem>
-            <SelectItem value="remarcada">Remarcada</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex gap-2 shrink-0">
-        <Button variant="outline" size="sm" onClick={onToday} className="gap-1.5 h-9 text-xs border-slate-200 shadow-sm rounded-lg">
-          <CalendarDays className="w-3.5 h-3.5" />
-          Hoje
-        </Button>
-        {canEdit && (
-          <Button size="sm" onClick={onNewConsulta} className="gap-1.5 h-9 text-xs shadow-sm rounded-lg">
-            <Plus className="w-3.5 h-3.5" />
-            Nova Marcação
-          </Button>
-        )}
-      </div>
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger className="h-8 w-32 text-[13px] border-dashed border-border/60 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="todos">Todos Status</SelectItem>
+          <SelectItem value="agendada">Agendada</SelectItem>
+          <SelectItem value="confirmada">Confirmada</SelectItem>
+          <SelectItem value="concluida">Concluída</SelectItem>
+          <SelectItem value="cancelada">Cancelada</SelectItem>
+          <SelectItem value="falta">Falta</SelectItem>
+          <SelectItem value="remarcada">Remarcada</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   );
 }

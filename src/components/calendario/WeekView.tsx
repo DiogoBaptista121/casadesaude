@@ -23,45 +23,62 @@ export function WeekView({ date, events, onEventClick }: WeekViewProps) {
   };
 
   return (
-    <Card className="overflow-hidden">
-      <div className="grid grid-cols-7 divide-x">
+    <div className="flex flex-col h-full rounded-xl border border-border/50 shadow-sm bg-card overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-border/50 bg-transparent shrink-0">
         {days.map((day) => {
-          const dayEvents = getEventsForDay(day);
           const isToday = isSameDay(day, today);
-          
           return (
-            <div key={day.toISOString()} className="min-h-48">
-              <div className={cn(
-                "p-2 text-center border-b",
-                isToday && "bg-primary/10"
+            <div key={`header-${day.toISOString()}`} className={cn(
+              "py-1.5 text-center transition-colors",
+              isToday && "bg-primary/5"
+            )}>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
+                {format(day, 'EEE', { locale: pt })}
+              </p>
+              <p className={cn(
+                "text-[11px] font-medium w-6 h-6 mx-auto rounded-full flex items-center justify-center mt-0.5",
+                isToday ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground"
               )}>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {format(day, 'EEE', { locale: pt })}
-                </p>
-                <p className={cn(
-                  "text-lg font-semibold",
-                  isToday && "text-primary"
-                )}>
-                  {format(day, 'd')}
-                </p>
-              </div>
-              <div className="p-1 space-y-1 max-h-64 overflow-y-auto">
+                {format(day, 'd')}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-2 custom-scrollbar min-h-0">
+        <div className="grid grid-cols-7 divide-x divide-border/50 h-full min-h-[500px]">
+          {days.map((day) => {
+            const dayEvents = getEventsForDay(day);
+            const isToday = isSameDay(day, today);
+            
+            return (
+              <div key={day.toISOString()} className={cn("p-1 transition-colors", isToday && "bg-primary/5")}>
+                <div className="space-y-[2px]">
                 {dayEvents.map((event) => (
-                  <CalendarEvent
+                  <button
                     key={event.id}
-                    event={event}
-                    onClick={onEventClick}
-                    compact
-                  />
+                    onClick={() => onEventClick(event)}
+                    className="w-full text-left flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm transition-opacity hover:opacity-80 text-[11px]"
+                    title={event.time + ' - ' + event.title}
+                    style={{
+                      backgroundColor: `${event.color || '#94a3b8'}26`,
+                      color: event.color || '#64748b'
+                    }}
+                  >
+                    <span className="font-semibold opacity-90 shrink-0">{event.time}</span>
+                    <span className="truncate font-medium">{event.title}</span>
+                  </button>
                 ))}
                 {dayEvents.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-4">-</p>
+                  <p className="text-[10px] text-muted-foreground/30 text-center py-2">-</p>
                 )}
               </div>
             </div>
           );
         })}
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }

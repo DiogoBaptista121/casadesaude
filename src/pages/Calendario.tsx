@@ -3,7 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/ui/page-header';
 import { CalendarFilters } from '@/components/calendario/CalendarFilters';
-import { CalendarViewSelector, CalendarView } from '@/components/calendario/CalendarViews';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { CalendarNavigation, CalendarViewToggles, CalendarView } from '@/components/calendario/CalendarViews';
 import { CalendarEventData } from '@/components/calendario/CalendarEvent';
 import { DayView } from '@/components/calendario/DayView';
 import { WeekView } from '@/components/calendario/WeekView';
@@ -11,7 +13,7 @@ import { MonthView } from '@/components/calendario/MonthView';
 import { YearView } from '@/components/calendario/YearView';
 import { AppointmentModal } from '@/components/calendario/AppointmentModal';
 import { MTEventViewModal } from '@/components/calendario/MTEventViewModal';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import type { Consulta, Servico, ConsultaOrigem, ConsultaStatus } from '@/types/database';
 
 // Local type that matches consultas_mt + joined funcionarios_mt
@@ -40,7 +42,11 @@ const origemLabels: Record<ConsultaOrigem, string> = {
 };
 
 export default function CalendarioPage() {
-  const { canEdit } = useAuth();
+  const { role } = useAuth();
+  // Roles that can create appointments
+  const canCreate = ['admin', 'gestor', 'colaborador_casa_saude'].includes(role || '');
+  // canEdit kept as alias for broader edit guard used in event click handler
+  const canEdit = ['admin', 'gestor', 'colaborador_casa_saude'].includes(role || '');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false); // non-blocking re-fetch indicator
   const [view, setView] = useState<CalendarView>('mes');
@@ -324,36 +330,35 @@ export default function CalendarioPage() {
   };
 
   return (
-    <div className="page-enter flex flex-col h-[calc(100vh-140px)] gap-2 max-w-7xl mx-auto w-full p-4 overflow-hidden">
+    <div className="page-enter flex flex-col h-full flex-1 min-h-0 gap-2 max-w-7xl mx-auto w-full p-4">
       <PageHeader
         title="Calendário"
         description="Visualização das consultas agendadas"
       />
 
-      <div className="shrink-0">
-        <CalendarFilters
-          servicos={servicos}
-          servicoFilter={servicoFilter}
-          setServicoFilter={setServicoFilter}
-          tipoFilter={tipoFilter}
-          setTipoFilter={setTipoFilter}
-          unidadeFilter={unidadeFilter}
-          setUnidadeFilter={setUnidadeFilter}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          onToday={handleToday}
-          onNewConsulta={handleNewAppointment}
-          canEdit={canEdit}
-        />
-      </div>
+      <div className="shrink-0 flex items-center justify-between gap-4 mb-2 bg-card rounded-xl border shadow-sm px-4 py-3 w-full overflow-x-auto custom-scrollbar">
+        {/* Left: Nav */}
+        <div className="flex items-center gap-3">
+          <CalendarNavigation view={view} setView={setView} currentDate={currentDate} setCurrentDate={setCurrentDate} />
+        </div>
 
-      <div className="shrink-0">
-        <CalendarViewSelector
-          view={view}
-          setView={setView}
-          currentDate={currentDate}
-          setCurrentDate={setCurrentDate}
-        />
+        {/* Center: Filters */}
+        <div className="flex-1 flex justify-center">
+          <CalendarFilters
+            servicos={servicos} servicoFilter={servicoFilter} setServicoFilter={setServicoFilter}
+            tipoFilter={tipoFilter} setTipoFilter={setTipoFilter} unidadeFilter={unidadeFilter}
+            setUnidadeFilter={setUnidadeFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+            onToday={handleToday} onNewConsulta={handleNewAppointment} canEdit={canCreate}
+          />
+        </div>
+
+        {/* Right: Views */}
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={handleToday} className="h-8 px-3 text-xs border-dashed text-muted-foreground hover:text-foreground">
+            Hoje
+          </Button>
+          <CalendarViewToggles view={view} setView={setView} />
+        </div>
       </div>
 
       {/* Loading indicator for navigation re-fetches */}
@@ -364,7 +369,7 @@ export default function CalendarioPage() {
         </div>
       )}
 
-      <div className="flex-1 overflow-auto min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col mt-2">
         {view === 'dia' && (
           <DayView date={currentDate} events={events} onEventClick={handleEventClick} />
         )}
@@ -394,6 +399,9 @@ export default function CalendarioPage() {
         onOpenChange={setMtViewModalOpen}
         event={selectedMTEvent}
       />
+
+      {/* Floating Action Button — visible for roles that can create appointments */}
+      {/* Deleted FAB */}
     </div>
   );
 }

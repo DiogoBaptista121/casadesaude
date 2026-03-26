@@ -36,28 +36,38 @@ export function DayView({ date, events, onEventClick }: DayViewProps) {
   }
 
   return (
-    <Card className="overflow-hidden">
-      <div className="divide-y">
-        {hours.map((hour) => {
-          const hourEvents = getEventsForHour(hour);
-          return (
-            <div key={hour} className="flex min-h-16">
-              <div className="w-20 p-2 text-sm text-muted-foreground bg-muted/30 flex-shrink-0 border-r">
-                {hour.toString().padStart(2, '0')}:00
+    <div className="flex flex-col h-full rounded-xl border border-border/50 shadow-sm bg-card overflow-hidden">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="divide-y divide-border/50">
+          {hours.map((hour) => {
+            const hourEvents = getEventsForHour(hour);
+            return (
+              <div key={hour} className="flex min-h-[80px]">
+                <div className="w-16 p-2 text-[11px] font-medium text-muted-foreground flex-shrink-0 border-r border-border/50 text-center tracking-wider bg-muted/10">
+                  {hour.toString().padStart(2, '0')}:00
+                </div>
+                <div className="flex-1 p-2 space-y-[2px]">
+                  {hourEvents.map((event) => (
+                    <button
+                      key={event.id}
+                      onClick={() => onEventClick(event)}
+                      className="w-full text-left flex items-center gap-2 px-2 py-1 rounded-sm transition-opacity hover:opacity-80 text-xs"
+                      title={event.time + ' - ' + event.title}
+                      style={{
+                        backgroundColor: `${event.color || '#94a3b8'}26`,
+                        color: event.color || '#64748b'
+                      }}
+                    >
+                      <span className="font-semibold opacity-90 shrink-0">{event.time}</span>
+                      <span className="truncate font-medium">{event.title}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex-1 p-2 space-y-1">
-                {hourEvents.map((event) => (
-                  <CalendarEvent
-                    key={event.id}
-                    event={event}
-                    onClick={onEventClick}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }

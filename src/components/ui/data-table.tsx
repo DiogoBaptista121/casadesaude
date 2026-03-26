@@ -59,11 +59,11 @@ export function DataTable<T extends { id: string }>({
       <div className="overflow-y-auto flex-1">
         <Table>
           <TableHeader className="sticky top-0 z-10">
-            <TableRow className="bg-muted/80 hover:bg-muted/80 backdrop-blur-sm">
+            <TableRow className="bg-muted/30 hover:bg-muted/30 backdrop-blur-sm">
               {columns.map((column) => (
                 <TableHead
                   key={column.key}
-                  className={cn("font-semibold text-foreground", column.className)}
+                  className={cn("text-xs uppercase tracking-wide text-muted-foreground", column.className)}
                 >
                   {column.header}
                 </TableHead>

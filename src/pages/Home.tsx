@@ -180,7 +180,7 @@ export default function HomePage() {
   const firstName = profile?.nome?.split(' ')[0] || 'Utilizador';
 
   return (
-    <div className="page-enter space-y-6 w-full relative">
+    <div className="flex flex-col gap-6 pb-12 w-full h-full flex-1 overflow-y-auto pr-2">
       {/* ── Greeting header ─────────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-4 pt-1">
         <div>
@@ -243,7 +243,7 @@ export default function HomePage() {
       )}
 
       {/* ── KPI Grid ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {KPI_CONFIG.map((cfg) => (
           <div key={cfg.key} className="bg-card p-5 rounded-2xl border shadow-sm">
             <div className="flex justify-between mb-4">
@@ -256,18 +256,33 @@ export default function HomePage() {
       </div>
 
       {/* ── Main split: Agenda + Chart ──────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Agenda */}
-        <div className="lg:col-span-2 bg-card rounded-2xl border p-5">
+        <div className="bg-card rounded-2xl border p-5 min-h-[350px]">
           <h2 className="text-sm font-semibold mb-4">Agenda de Hoje</h2>
           {loading ? <Skeleton className="h-40 w-full" /> : agendaHoje.length === 0 ? <p className="text-xs text-muted-foreground">Sem marcações.</p> : (
             <div className="space-y-3">
               {agendaHoje.map(item => (
-                <div key={item.id} className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded-xl cursor-pointer" onClick={() => navigate('/consultas')}>
+                <div key={item.id} className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded-xl cursor-pointer" onClick={() => {
+                    const consultasUrl =
+                      role === 'colaborador_casa_saude' ? '/consultas/casa-saude' :
+                      role === 'colaborador_unidade_movel' ? '/consultas/unidade-movel' :
+                      role === 'psicologa' ? '/consultas/psicologia' :
+                      '/consultas';
+                    navigate(consultasUrl);
+                  }}>
                   <div className="w-1 h-8 rounded-full" style={{ background: item.servico_cor ?? '#ccc' }} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.nome_completo ?? item.paciente_nif}</p>
-                    <p className="text-xs text-muted-foreground">{item.hora} · {item.servico_nome}</p>
+                    <p className="text-sm font-medium truncate">
+                      {item.paciente_nif === 'sessao' 
+                        ? 'Sessão de Neurologia' 
+                        : (item.nome_completo ?? item.paciente_nif)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.hora} · {item.paciente_nif === 'sessao' 
+                        ? `Sessão · ${item.local}` 
+                        : item.servico_nome}
+                    </p>
                   </div>
                   <StatusBadge status={item.status} />
                 </div>
@@ -277,11 +292,11 @@ export default function HomePage() {
         </div>
 
         {/* Chart */}
-        <div className="lg:col-span-3 bg-card rounded-2xl border p-5">
+        <div className="bg-card rounded-2xl border p-5 min-h-[350px] flex flex-col">
           <h2 className="text-sm font-semibold mb-4">Atividade Semanal</h2>
-          <div className="h-[300px]">
+          <div className="p-6 h-[350px] w-full block">
             {loading ? <Skeleton className="h-full w-full" /> : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height={320}>
                 <LineChart data={chartData}>
                   <CartesianGrid vertical={false} strokeDasharray="4 4" strokeOpacity={0.5} />
                   <XAxis dataKey="dia" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />

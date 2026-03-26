@@ -20,8 +20,15 @@ import DefinicoesPage from "./pages/Definicoes";
 import NotFound from "./pages/NotFound";
 import HorariosLocaisPage from "./pages/HorariosLocais";
 import AgendaUnidadeMovelPage from "./pages/AgendaUnidadeMovel";
+import ConsultasCasaSaudePage from "./pages/ConsultasCasaSaude";
+import ConsultasNeurologiaPage from "./pages/ConsultasNeurologia";
+import ConsultasPsicologiaPage from "./pages/ConsultasPsicologia";
+import ConsultasEnfermagemPage from "./pages/ConsultasEnfermagem"; // kept in project, no active route
+import ConsultasUnidadeMovelPage from "./pages/ConsultasUnidadeMovel";
 
 const queryClient = new QueryClient();
+
+// All sub-pages now have real implementations — no more inline placeholders
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -63,6 +70,12 @@ function RoleProtectedRoute({
   }
 
   if (!allowedRoles.includes(role || '')) {
+    // Smart redirect for /consultas: send each role to their own page
+    if (typeof window !== 'undefined' && window.location.pathname === '/consultas') {
+      if (role === 'colaborador_casa_saude') return <Navigate to="/consultas/casa-saude" replace />;
+      if (role === 'colaborador_unidade_movel') return <Navigate to="/consultas/unidade-movel" replace />;
+      if (role === 'psicologa') return <Navigate to="/consultas/psicologia" replace />;
+    }
     return <Navigate to="/" replace />;
   }
 
@@ -84,8 +97,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
       <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-      <Route path="/cartao-saude" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor', 'colaborador']}><CartaoSaudePage /></RoleProtectedRoute>} />
-      <Route path="/consultas" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor', 'colaborador']}><ConsultasPage /></RoleProtectedRoute>} />
+      <Route path="/cartao-saude" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor', 'colaborador_casa_saude', 'colaborador_unidade_movel']}><CartaoSaudePage /></RoleProtectedRoute>} />
+      <Route path="/consultas" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor']}><ConsultasPage /></RoleProtectedRoute>} />
       <Route path="/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
       <Route path="/horarios-locais" element={<ProtectedRoute><HorariosLocaisPage /></ProtectedRoute>} />
       <Route path="/agenda-unidade-movel" element={<ProtectedRoute><AgendaUnidadeMovelPage /></ProtectedRoute>} />
@@ -93,6 +106,11 @@ function AppRoutes() {
       <Route path="/dashboard" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor']}><DashboardPage /></RoleProtectedRoute>} />
       <Route path="/importar-exportar" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor']}><ImportarExportarPage /></RoleProtectedRoute>} />
       <Route path="/definicoes" element={<ProtectedRoute><DefinicoesPage /></ProtectedRoute>} />
+      <Route path="/consultas/casa-saude" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor', 'colaborador_casa_saude']}><ConsultasCasaSaudePage /></RoleProtectedRoute>} />
+      <Route path="/consultas/neurologia" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor']}><ConsultasNeurologiaPage /></RoleProtectedRoute>} />
+      <Route path="/consultas/psicologia" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor', 'psicologa']}><ConsultasPsicologiaPage /></RoleProtectedRoute>} />
+      {/* /consultas/enfermagem route removed — ConsultasEnfermagem.tsx kept in project */}
+      <Route path="/consultas/unidade-movel" element={<RoleProtectedRoute allowedRoles={['admin', 'gestor', 'colaborador_unidade_movel']}><ConsultasUnidadeMovelPage /></RoleProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      psicologas: {
+        Row: {
+          id: string
+          nome: string
+          email: string | null
+          telefone: string | null
+          ativo: boolean
+          user_id: string | null
+          created_at: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          nome: string
+          email?: string | null
+          telefone?: string | null
+          ativo?: boolean
+          user_id?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          nome?: string
+          email?: string | null
+          telefone?: string | null
+          ativo?: boolean
+          user_id?: string | null
+          created_at?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       auditoria_logs: {
         Row: {
           acao: string
@@ -830,7 +863,7 @@ export type Database = {
       is_admin_or_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "manager" | "staff" | "viewer"
+      app_role: "admin" | "gestor" | "colaborador_casa_saude" | "colaborador_unidade_movel" | "psicologa" | "visualizador"
       consulta_origem: "casa_saude" | "unidade_movel"
       consulta_status:
       | "agendada"
@@ -967,7 +1000,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "staff", "viewer"],
+      app_role: ["admin", "gestor", "colaborador_casa_saude", "colaborador_unidade_movel", "psicologa", "visualizador"],
       consulta_origem: ["casa_saude", "unidade_movel"],
       consulta_status: [
         "agendada",

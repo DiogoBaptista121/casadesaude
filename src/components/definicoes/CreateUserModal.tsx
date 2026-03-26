@@ -19,7 +19,9 @@ interface CreateUserModalProps {
 const roleLabels: Record<AppRole, string> = {
     admin: 'Administrador',
     gestor: 'Gestor',
-    colaborador: 'Colaborador',
+    colaborador_casa_saude: 'Colaborador Casa de Saúde',
+    colaborador_unidade_movel: 'Colaborador Unidade Móvel',
+    psicologa: 'Psicóloga',
     visualizador: 'Visualizador',
 };
 
@@ -169,7 +171,9 @@ export function CreateUserModal({ open, onOpenChange, onSuccess }: CreateUserMod
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="visualizador">Visualizador — só leitura</SelectItem>
-                                <SelectItem value="colaborador">Colaborador — ver e editar consultas</SelectItem>
+                                <SelectItem value="colaborador_casa_saude">Colaborador Casa de Saúde</SelectItem>
+                                <SelectItem value="colaborador_unidade_movel">Colaborador Unidade Móvel</SelectItem>
+                                <SelectItem value="psicologa">Psicóloga</SelectItem>
                                 <SelectItem value="gestor">Gestor — gerir dados, sem admin</SelectItem>
                                 <SelectItem value="admin">Administrador — acesso total</SelectItem>
                             </SelectContent>

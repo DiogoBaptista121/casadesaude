@@ -25,8 +25,8 @@ export function YearView({ date, events, onMonthClick }: YearViewProps) {
   };
 
   return (
-    <Card className="p-4">
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+    <div className="overflow-y-auto h-full p-2 custom-scrollbar">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {months.map((month) => {
           const eventCount = getEventCountForMonth(month);
           const days = eachDayOfInterval({
@@ -38,9 +38,9 @@ export function YearView({ date, events, onMonthClick }: YearViewProps) {
             <button
               key={month.toISOString()}
               onClick={() => onMonthClick(month)}
-              className="p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors text-left"
+              className="bg-card rounded-xl border border-border/50 shadow-sm p-4 hover:border-primary/50 hover:shadow-md hover:bg-muted/10 transition-all text-left group"
             >
-              <p className="font-semibold capitalize mb-2">
+              <p className="font-medium text-sm capitalize mb-3 text-muted-foreground group-hover:text-foreground transition-colors">
                 {format(month, 'MMMM', { locale: pt })}
               </p>
               <div className="grid grid-cols-7 gap-0.5 text-xs">
@@ -60,9 +60,9 @@ export function YearView({ date, events, onMonthClick }: YearViewProps) {
                     <span
                       key={day.toISOString()}
                       className={cn(
-                        "w-4 h-4 flex items-center justify-center rounded-full text-center",
-                        hasEvent && "bg-primary/20 text-primary font-medium",
-                        isToday && "ring-1 ring-primary"
+                        "w-5 h-5 flex items-center justify-center rounded-full text-center mx-auto text-[11px]",
+                        hasEvent && "bg-primary/10 text-primary font-medium",
+                        isToday && "bg-primary text-primary-foreground font-bold shadow-sm"
                       )}
                     >
                       {format(day, 'd')}
@@ -79,6 +79,6 @@ export function YearView({ date, events, onMonthClick }: YearViewProps) {
           );
         })}
       </div>
-    </Card>
+    </div>
   );
 }
