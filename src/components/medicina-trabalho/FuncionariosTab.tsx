@@ -33,6 +33,16 @@ import {
   Users,
   Trash2
 } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { FuncionarioMT } from '@/types/database';
 import { getExamStatus, calculateNextExam } from '@/lib/examUtils';
@@ -774,14 +784,28 @@ export function FuncionariosTab() {
                 <Label className="text-sm flex items-center gap-2">
                   Data de Nascimento
                 </Label>
-                <Input
-                  type="date"
-                  value={formData.data_nascimento}
-                  onChange={(e) =>
-                    setFormData({ ...formData, data_nascimento: e.target.value })
-                  }
-                  className="h-10"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-10 px-3",
+                        !formData.data_nascimento && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.data_nascimento ? format(new Date(formData.data_nascimento), "PPP", { locale: pt }) : <span>Selecione uma data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.data_nascimento ? new Date(formData.data_nascimento) : undefined}
+                      onSelect={(date) => setFormData({ ...formData, data_nascimento: date ? date.toISOString() : '' })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
@@ -811,21 +835,53 @@ export function FuncionariosTab() {
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-3">
                 <Label className="text-sm">Data de Admissão</Label>
-                <Input
-                  type="date"
-                  value={formData.data_admissao}
-                  onChange={(e) => setFormData({ ...formData, data_admissao: e.target.value })}
-                  className="h-10"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-10 px-3",
+                        !formData.data_admissao && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.data_admissao ? format(new Date(formData.data_admissao), "PPP", { locale: pt }) : <span>Selecione uma data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.data_admissao ? new Date(formData.data_admissao) : undefined}
+                      onSelect={(date) => setFormData({ ...formData, data_admissao: date ? date.toISOString() : '' })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-3">
                 <Label className="text-sm">Último Exame</Label>
-                <Input
-                  type="date"
-                  value={formData.ultimo_exame}
-                  onChange={(e) => setFormData({ ...formData, ultimo_exame: e.target.value })}
-                  className="h-10"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-10 px-3",
+                        !formData.ultimo_exame && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.ultimo_exame ? format(new Date(formData.ultimo_exame), "PPP", { locale: pt }) : <span>Selecione uma data</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.ultimo_exame ? new Date(formData.ultimo_exame) : undefined}
+                      onSelect={(date) => setFormData({ ...formData, ultimo_exame: date ? date.toISOString() : '' })}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>
